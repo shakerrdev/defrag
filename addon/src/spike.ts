@@ -89,8 +89,7 @@ function setBotFrozen(frozen: boolean) {
 function setBotTrigger(allowed: boolean) {
   if (state.triggerAllowed === allowed) return;
   state.triggerAllowed = allowed;
-  Console.ServerCommand(`bot_dont_shoot ${allowed ? 0 : 1}`);
-  debug(`bot trigger ${allowed ? "on" : "off"}`);
+  Console.SetConvar("bot_dont_shoot", !allowed);
 }
 
 function releaseBotForShooting() {
@@ -105,7 +104,6 @@ let nextDebugSaveAt = 0;
 
 function debug(message: string) {
   const line = `t=${Instance.GetGameTime().toFixed(3)} ${message}`;
-  Console.Log(`[defrag:debug] ${line}`);
   debugLines.push(line);
   if (debugLines.length > 300) debugLines.shift();
   debugDirty = true;
@@ -276,7 +274,8 @@ function engage(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
   if (settings.shoot === "assist") {
     const stopped = speed2d(b.GetAbsVelocity()) < STOPPED_SPEED;
     if (!state.triggerAllowed) state.burstLimit = burstFor(distance(eye(b), eye(h)));
-    return setBotTrigger(error <= ON_TARGET_DEGREES && stopped && now >= state.burstResetUntil);
+    const onTarget = error <= (state.triggerAllowed ? ON_TARGET_DEGREES * 2 : ON_TARGET_DEGREES);
+    return setBotTrigger(onTarget && stopped && now >= state.burstResetUntil);
   }
   if (error > ON_TARGET_DEGREES || now < state.nextShotAt) return;
   state.nextShotAt = now + settings.fireInterval;
