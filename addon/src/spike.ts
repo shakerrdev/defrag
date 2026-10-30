@@ -81,6 +81,12 @@ function setBotFrozen(frozen: boolean) {
   Console.ServerCommand(`bot_stop ${frozen ? 1 : 0}`);
 }
 
+function releaseBotForShooting() {
+  if (settings.shoot !== "hybrid" && settings.shoot !== "input") return;
+  Console.ServerCommand(`bot_dont_shoot ${settings.shoot === "input" ? 1 : 0}`);
+  setBotFrozen(false);
+}
+
 const debugLines: string[] = [];
 let debugDirty = false;
 let nextDebugSaveAt = 0;
@@ -106,8 +112,7 @@ function setupServer() {
   Console.SetConvar("mp_freezetime", 0);
   Console.SetConvar("mp_respawn_on_death_t", true);
   Console.SetConvar("mp_respawn_on_death_ct", true);
-  Console.SetConvar("sv_infinite_ammo", 2);
-  Console.SetConvar("bot_dont_shoot", false);
+  Console.SetConvar("sv_infinite_ammo", 1);
   Console.SetConvar("bot_difficulty", 3);
   setBotFrozen(true);
 }
@@ -289,7 +294,7 @@ function tick() {
     if (now >= state.phaseEndsAt) {
       state.peekStartedAt = now;
       state.phase = "peeking";
-      if (settings.shoot === "hybrid") setBotFrozen(false);
+      releaseBotForShooting();
     }
   } else if (state.phase === "peeking" || state.phase === "fighting") {
     if (!b || !h) return endRep(b ? "you died" : "bot died");
