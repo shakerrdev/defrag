@@ -347,3 +347,8 @@ load();
 setupServer();
 Instance.SetThink(schedule);
 Instance.SetNextThink(Instance.GetGameTime() + TICK);
+Instance.Delay(1).then(() => {
+  if (!humanController()) return;
+  if (!botController()) addBot();
+  tell("spike loaded, type !help for commands");
+});
