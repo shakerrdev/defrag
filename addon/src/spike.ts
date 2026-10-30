@@ -6,18 +6,22 @@ import {
   Instance,
   type CSPlayerController,
   type CSPlayerPawn,
+  type QAngle,
 } from "cs_script/point_script";
 import { flushChat, parseCommand, recentMessages, tell } from "./spike/chat.ts";
 import { add, distance, lookAt, randomBetween, round, ZERO } from "./spike/math.ts";
 import { Recorder, sampleAt, sampleOf, type Holder, type Peek } from "./spike/peek.ts";
 
 type MoveMode = "move" | "teleport" | "velocity";
-type ShootMode = "off" | "hybrid" | "fake";
+type ShootMode = "off" | "hybrid" | "fake" | "input";
 type Phase = "idle" | "armed" | "waiting" | "peeking" | "fighting" | "gap";
 
 const TICK = 1 / 64;
 const CHEST = { x: 0, y: 0, z: 40 };
 const DRIFT_LIMIT = 24;
+const MAX_TURN_PER_TICK = 15;
+const ON_TARGET_DEGREES = 2;
+const HEAD_OFFSET = { x: 0, y: 0, z: -2 };
 
 const settings = {
   move: "move" as MoveMode,
@@ -43,6 +47,8 @@ const state = {
   peekStartedAt: 0,
   visibleAt: undefined as number | undefined,
   nextShotAt: 0,
+  aim: undefined as QAngle | undefined,
+  releaseTriggerAt: undefined as number | undefined,
   lastHitGroup: undefined as CSHitGroup | undefined,
 };
 
@@ -114,19 +120,60 @@ function canSee(viewer: CSPlayerPawn, target: CSPlayerPawn) {
   );
 }
 
-function applySample(pawn: CSPlayerPawn, index: number) {
+function aimTakenOver() {
+  if (state.visibleAt === undefined) return false;
+  return settings.shoot === "fake" || settings.shoot === "input" || settings.shoot === "hybrid";
+}
+
+function applySample(pawn: CSPlayerPawn, index: number, still = false) {
   const s = sampleAt(state.peek!, index);
-  const angles = { pitch: 0, yaw: s.yaw, roll: 0 };
-  if (settings.move === "move") {
-    pawn.Move({ position: s.position, angles, velocity: s.velocity });
+  const velocity = still ? ZERO : s.velocity;
+  const yaw = state.aim?.yaw ?? (aimTakenOver() ? undefined : s.yaw);
+  const angles = yaw === undefined ? undefined : { pitch: 0, yaw, roll: 0 };
+  if (settings.move === "move" || still) {
+    pawn.Move({ position: s.position, angles, velocity });
   } else if (settings.move === "teleport") {
-    pawn.Teleport({ position: s.position, angles, velocity: s.velocity });
+    pawn.Teleport({ position: s.position, angles, velocity });
   } else if (distance(pawn.GetAbsOrigin(), s.position) > DRIFT_LIMIT) {
-    pawn.Move({ position: s.position, angles, velocity: s.velocity });
+    pawn.Move({ position: s.position, angles, velocity });
   } else {
-    pawn.Teleport({ angles, velocity: s.velocity });
+    pawn.Teleport({ angles, velocity });
   }
-  pawn.SetEyeAngles({ pitch: s.pitch, yaw: s.yaw, roll: 0 });
+  if (!aimTakenOver()) pawn.SetEyeAngles({ pitch: s.pitch, yaw: s.yaw, roll: 0 });
+}
+
+function angleDelta(from: number, to: number) {
+  return ((((to - from) % 360) + 540) % 360) - 180;
+}
+
+function aimStep(b: CSPlayerPawn, h: CSPlayerPawn) {
+  const current = state.aim ?? b.GetEyeAngles();
+  const target = lookAt(eye(b), add(eye(h), HEAD_OFFSET));
+  const dYaw = angleDelta(current.yaw, target.yaw);
+  const dPitch = target.pitch - current.pitch;
+  const error = Math.hypot(dYaw, dPitch);
+  const t = error > MAX_TURN_PER_TICK ? MAX_TURN_PER_TICK / error : 1;
+  state.aim = { pitch: current.pitch + dPitch * t, yaw: current.yaw + dYaw * t, roll: 0 };
+  b.SetEyeAngles(state.aim);
+  return error * (1 - t);
+}
+
+function botSlot() {
+  return botController()?.GetPlayerSlot();
+}
+
+function pressTrigger(now: number) {
+  const slot = botSlot();
+  if (slot === undefined) return;
+  Console.ClientCommand(slot, "+attack");
+  state.releaseTriggerAt = now + 2 * TICK;
+}
+
+function releaseTrigger(now: number, force = false) {
+  if (state.releaseTriggerAt === undefined || (!force && now < state.releaseTriggerAt)) return;
+  const slot = botSlot();
+  if (slot !== undefined) Console.ClientCommand(slot, "-attack");
+  state.releaseTriggerAt = undefined;
 }
 
 function startRep() {
@@ -144,23 +191,22 @@ function startRep() {
   b.SetHealth(100);
   if (!b.FindWeapon("weapon_ak47")) b.GiveNamedItem("weapon_ak47", true);
   b.Teleport({ position: state.peek.samples[0]!.position, velocity: ZERO });
-  applySample(b, 0);
   state.visibleAt = undefined;
+  state.aim = undefined;
   state.lastHitGroup = undefined;
+  applySample(b, 0, true);
   setPhase("waiting", randomBetween(settings.delayMin, settings.delayMax));
 }
 
 function endRep(result: string) {
+  releaseTrigger(Instance.GetGameTime(), true);
   setBotFrozen(true);
   tell(result);
   if (settings.loop) setPhase("gap", 1);
   else setPhase("idle");
 }
 
-function fakeShot(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
-  if (!canSee(b, h)) return;
-  b.SetEyeAngles(lookAt(eye(b), eye(h)));
-  state.nextShotAt = now + settings.fireInterval;
+function fakeShot(h: CSPlayerPawn, b: CSPlayerPawn) {
   if (Math.random() > settings.accuracy) return;
   const head = Math.random() < settings.headshotShare;
   h.TakeDamage({
@@ -170,6 +216,16 @@ function fakeShot(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
     inflictor: b,
     weapon: b.GetActiveWeapon(),
   });
+}
+
+function engage(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
+  if (settings.shoot !== "fake" && settings.shoot !== "input") return;
+  if (state.visibleAt === undefined || now < state.visibleAt + settings.reactMs / 1000 || !canSee(b, h)) return;
+  const error = aimStep(b, h);
+  if (error > ON_TARGET_DEGREES || now < state.nextShotAt) return;
+  state.nextShotAt = now + settings.fireInterval;
+  if (settings.shoot === "fake") fakeShot(h, b);
+  else pressTrigger(now);
 }
 
 function trackVisibility(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
@@ -190,23 +246,26 @@ function tick() {
       setPhase("idle");
       tell(`recorded a peek: ${samples.length} ticks, ${round(samples.length * TICK, 2)} s`);
     }
-  } else if (state.phase === "waiting" && now >= state.phaseEndsAt) {
-    state.peekStartedAt = now;
-    state.phase = "peeking";
+  } else if (state.phase === "waiting") {
+    if (b) applySample(b, 0, true);
+    if (now >= state.phaseEndsAt) {
+      state.peekStartedAt = now;
+      state.phase = "peeking";
+      if (settings.shoot === "hybrid") setBotFrozen(false);
+    }
   } else if (state.phase === "peeking" || state.phase === "fighting") {
     if (!b || !h) return endRep(b ? "you died" : "bot died");
+    releaseTrigger(now);
     trackVisibility(b, h, now);
+    const last = state.peek!.samples.length - 1;
     if (state.phase === "peeking") {
       const index = ((now - state.peekStartedAt) / TICK) * settings.speed;
       applySample(b, index);
-      if (index >= state.peek!.samples.length - 1) {
-        setPhase("fighting", settings.fightSeconds);
-        if (settings.shoot === "hybrid") setBotFrozen(false);
-      }
+      if (index >= last) setPhase("fighting", settings.fightSeconds);
+    } else {
+      applySample(b, last, true);
     }
-    if (settings.shoot === "fake" && state.visibleAt !== undefined && now >= state.nextShotAt) {
-      fakeShot(b, h, now);
-    }
+    engage(b, h, now);
     if (state.phase === "fighting" && now >= state.phaseEndsAt) endRep("bot survived");
   } else if (state.phase === "gap" && now >= state.phaseEndsAt) {
     if (settings.loop) startRep();
@@ -216,7 +275,7 @@ function tick() {
 
 const help = [
   "!hold = holding spot, !rec = record a peek (swing out, then stop), !play / !loop / !stop",
-  "!mode move|teleport|velocity, !shoot off|hybrid|fake, !speed 0.25-2",
+  "!mode move|teleport|velocity, !shoot fake|input|hybrid|off, !speed 0.25-2",
   "!react <ms>, !acc <0-1>, !god on|off, !bot, !status, !dump",
 ];
 
@@ -324,7 +383,7 @@ function onCommand(name: string, args: string[]) {
       settings.move = arg as MoveMode;
       return status();
     case "shoot":
-      if (!["off", "hybrid", "fake"].includes(arg)) return tell("shoot: off, hybrid or fake");
+      if (!["off", "hybrid", "fake", "input"].includes(arg)) return tell("shoot: fake, input, hybrid or off");
       settings.shoot = arg as ShootMode;
       return status();
     case "speed":

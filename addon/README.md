@@ -7,7 +7,11 @@ Map scripts for the defrag Workshop addon. Every `src/*.ts` file is one script; 
 `src/spike.ts` lets you record your own peek and then replays it on a bot while you hold the angle, with switches for the open questions:
 
 - **Movement:** `move` (`Entity.Move`, keeps the client's interpolation), `teleport` (`Entity.Teleport` every tick) or `velocity` (sets only velocity and corrects drift over 24 units).
-- **Shooting back:** `fake` (the script aims and applies damage after a reaction time, with a set accuracy), `hybrid` (the game's bot AI takes over after the swing via `bot_stop 0`) or `off`.
+- **Shooting back:**
+  - `fake`: after the reaction time the script turns the bot's aim smoothly onto you (max 15° per tick) and applies damage with a set hit chance. Silent: no sound, muzzle flash or tracer, because the API has no way to fire a weapon or play effects.
+  - `input` (experimental): same aiming, but the script presses the bot's fire button with `+attack` sent to the bot's slot, for real shots if bots accept that command.
+  - `hybrid`: the bot is unfrozen for the peek and the game's bot AI aims and shoots for real, while the script keeps moving it along the recorded path.
+  - `off`.
 
 The bot stays frozen with `bot_stop 1` while the script moves it.
 
@@ -34,7 +38,7 @@ With `watch.cmd` (or `pnpm watch:addon`) running, saving a script rebuilds it an
 | `!rec` | Arms recording: it starts when you move and stops once you've stood still for ¼ s |
 | `!play` / `!loop` / `!stop` | Runs the peek once / repeatedly with a random 0.4–1.6 s delay / stops |
 | `!mode move\|teleport\|velocity` | Movement method |
-| `!shoot off\|hybrid\|fake` | How the bot shoots back |
+| `!shoot fake\|input\|hybrid\|off` | How the bot shoots back |
 | `!speed 0.25–2` | Playback speed |
 | `!react <ms>`, `!acc <0–1>` | Reaction time and hit chance per shot in `fake` mode |
 | `!god on\|off` | God mode keeps you alive (on by default) |
