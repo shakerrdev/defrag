@@ -6,7 +6,7 @@ The goal is 80–90% of the real thing, not a full clone.
 
 ## Status
 
-Early. The first step is a spike that answers the one question the whole project depends on: can a map script move a bot along a recorded peek so it looks like a real player swinging out?
+Early. The first step is a spike that answers the one question the whole project depends on: can a map script move a bot along a recorded peek so it looks like a real player swinging out? It's ready to try in game: see [addon/README.md](addon/README.md).
 
 ## How it will work
 
@@ -31,6 +31,7 @@ Needs Node 22.18+ and pnpm 10, plus CS2 with the Counter-Strike 2 Workshop Tools
 ```sh
 pnpm install
 pnpm check
+pnpm test
 pnpm build:addon
 ```
 
