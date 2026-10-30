@@ -72,7 +72,7 @@ function bot() {
 }
 
 function setBotFrozen(frozen: boolean) {
-  Console.SetConvar("bot_stop", frozen);
+  Console.ServerCommand(`bot_stop ${frozen ? 1 : 0}`);
 }
 
 function setupServer() {
@@ -89,8 +89,12 @@ function setupServer() {
 
 function addBot() {
   const team = humanController()?.GetTeamNumber() === 2 ? "ct" : "t";
-  Console.ServerCommand(`bot_kick; bot_add_${team}`);
+  Console.ServerCommand(`bot_kick; bot_quota 0; bot_add_${team}`);
   tell(`adding a ${team.toUpperCase()} bot`);
+}
+
+function ensureOneBot() {
+  if (controllers().filter((c) => c.IsBot()).length !== 1) addBot();
 }
 
 function setPhase(phase: Phase, seconds = 0) {
@@ -310,7 +314,7 @@ Instance.OnPlayerActivate(({ player }) => {
   if (player.IsBot()) return;
   setupServer();
   Instance.Delay(1).then(() => {
-    if (!botController()) addBot();
+    ensureOneBot();
     tell("type !help for commands");
   });
 });
@@ -349,6 +353,6 @@ Instance.SetThink(schedule);
 Instance.SetNextThink(Instance.GetGameTime() + TICK);
 Instance.Delay(1).then(() => {
   if (!humanController()) return;
-  if (!botController()) addBot();
+  ensureOneBot();
   tell("spike loaded, type !help for commands");
 });
