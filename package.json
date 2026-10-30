@@ -1,0 +1,17 @@
+{
+  "name": "defrag",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build:addon": "pnpm --filter @defrag/addon build",
+    "watch:addon": "pnpm --filter @defrag/addon watch",
+    "check": "pnpm -r check"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}

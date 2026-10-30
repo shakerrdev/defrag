@@ -1,0 +1,3 @@
+packages:
+  - addon
+  - packages/*
