@@ -81,12 +81,26 @@ function setBotFrozen(frozen: boolean) {
   Console.ServerCommand(`bot_stop ${frozen ? 1 : 0}`);
 }
 
+const debugLines: string[] = [];
+let debugDirty = false;
+let nextDebugSaveAt = 0;
+
 function debug(message: string) {
-  Console.Log(`[defrag:debug] t=${Instance.GetGameTime().toFixed(3)} ${message}`);
+  const line = `t=${Instance.GetGameTime().toFixed(3)} ${message}`;
+  Console.Log(`[defrag:debug] ${line}`);
+  debugLines.push(line);
+  if (debugLines.length > 300) debugLines.shift();
+  debugDirty = true;
+}
+
+function flushDebug(now: number) {
+  if (!debugDirty || now < nextDebugSaveAt) return;
+  save();
+  debugDirty = false;
+  nextDebugSaveAt = now + 0.5;
 }
 
 function setupServer() {
-  Console.SetConvar("con_logfile", "defrag_console.log");
   Console.SetConvar("mp_ignore_round_win_conditions", true);
   Console.SetConvar("mp_roundtime", 60);
   Console.SetConvar("mp_freezetime", 0);
@@ -202,10 +216,12 @@ function startRep() {
   state.aim = undefined;
   state.lastHitGroup = undefined;
   applySample(b, 0, true);
+  debug(`rep start, shoot ${settings.shoot}, move ${settings.move}, react ${settings.reactMs} ms`);
   setPhase("waiting", randomBetween(settings.delayMin, settings.delayMax));
 }
 
 function endRep(result: string) {
+  debug(`rep end: ${result}`);
   releaseTrigger(Instance.GetGameTime(), true);
   setBotFrozen(true);
   tell(result);
@@ -225,9 +241,17 @@ function fakeShot(h: CSPlayerPawn, b: CSPlayerPawn) {
   });
 }
 
+let engageTicks = 0;
+
 function engage(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
   if (settings.shoot !== "fake" && settings.shoot !== "input") return;
-  if (state.visibleAt === undefined || now < state.visibleAt + settings.reactMs / 1000 || !canSee(b, h)) return;
+  if (state.visibleAt === undefined || now < state.visibleAt + settings.reactMs / 1000) return;
+  const visible = canSee(b, h);
+  if (engageTicks++ % 16 === 0) {
+    const weapon = b.GetActiveWeapon();
+    debug(`engage: bot sees you ${visible}, weapon ${weapon?.GetData().GetName()} clip ${weapon?.GetClipAmmo()}, next shot in ${(state.nextShotAt - now).toFixed(2)} s`);
+  }
+  if (!visible) return;
   const error = aimStep(b, h);
   if (error > ON_TARGET_DEGREES || now < state.nextShotAt) return;
   debug(`shot due, mode ${settings.shoot}, aim error ${error.toFixed(2)}`);
@@ -239,6 +263,7 @@ function engage(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
 function trackVisibility(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
   if (state.visibleAt !== undefined || !canSee(h, b)) return;
   state.visibleAt = now;
+  debug("bot became visible to you");
   state.nextShotAt = now + settings.reactMs / 1000;
 }
 
@@ -331,6 +356,7 @@ function schedule() {
   try {
     tick();
     flushChat(now);
+    flushDebug(now);
     drawOverlay(now);
   } catch (error) {
     Console.Log(`[defrag] tick failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
@@ -347,7 +373,7 @@ function status() {
 }
 
 function save() {
-  Instance.SetSaveData(JSON.stringify({ holder: state.holder, peek: state.peek }));
+  Instance.SetSaveData(JSON.stringify({ holder: state.holder, peek: state.peek, debug: debugLines }));
 }
 
 function load() {
