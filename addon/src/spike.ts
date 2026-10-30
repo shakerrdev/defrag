@@ -244,14 +244,19 @@ function fakeShot(h: CSPlayerPawn, b: CSPlayerPawn) {
 let engageTicks = 0;
 
 function engage(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
-  if (settings.shoot !== "fake" && settings.shoot !== "input") return;
-  if (state.visibleAt === undefined || now < state.visibleAt + settings.reactMs / 1000) return;
+  if (settings.shoot === "off" || state.visibleAt === undefined) return;
   const visible = canSee(b, h);
   if (engageTicks++ % 16 === 0) {
     const weapon = b.GetActiveWeapon();
-    debug(`engage: bot sees you ${visible}, weapon ${weapon?.GetData().GetName()} clip ${weapon?.GetClipAmmo()}, next shot in ${(state.nextShotAt - now).toFixed(2)} s`);
+    const target = lookAt(eye(b), eye(h));
+    const aim = b.GetEyeAngles();
+    const off = Math.hypot(angleDelta(aim.yaw, target.yaw), target.pitch - aim.pitch);
+    debug(
+      `engage: bot sees you ${visible}, aim off by ${off.toFixed(1)} deg, weapon ${weapon?.GetData().GetName()} ` +
+        `clip ${weapon?.GetClipAmmo()}, bot_stop ${Console.GetConvarString("bot_stop")}, bot_difficulty ${Console.GetConvarString("bot_difficulty")}`,
+    );
   }
-  if (!visible) return;
+  if (settings.shoot === "hybrid" || now < state.visibleAt + settings.reactMs / 1000 || !visible) return;
   const error = aimStep(b, h);
   if (error > ON_TARGET_DEGREES || now < state.nextShotAt) return;
   debug(`shot due, mode ${settings.shoot}, aim error ${error.toFixed(2)}`);
