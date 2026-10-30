@@ -7,7 +7,7 @@ import {
   type CSPlayerController,
   type CSPlayerPawn,
 } from "cs_script/point_script";
-import { parseCommand, tell } from "./spike/chat.ts";
+import { flushChat, parseCommand, recentMessages, tell } from "./spike/chat.ts";
 import { add, distance, lookAt, randomBetween, round, ZERO } from "./spike/math.ts";
 import { Recorder, sampleAt, sampleOf, type Holder, type Peek } from "./spike/peek.ts";
 
@@ -214,18 +214,62 @@ function tick() {
   }
 }
 
-function schedule() {
-  tick();
-  Instance.SetNextThink(Instance.GetGameTime() + TICK);
+const help = [
+  "!hold = holding spot, !rec = record a peek (swing out, then stop), !play / !loop / !stop",
+  "!mode move|teleport|velocity, !shoot off|hybrid|fake, !speed 0.25-2",
+  "!react <ms>, !acc <0-1>, !god on|off, !bot, !status, !dump",
+];
+
+const OVERLAY_X = 100;
+const OVERLAY_Y = 420;
+const LINE = 14;
+const WHITE = { r: 255, g: 255, b: 255 };
+const YELLOW = { r: 255, g: 220, b: 90 };
+const GREY = { r: 190, g: 190, b: 190 };
+let helpUntil = 0;
+
+function phaseHint() {
+  switch (state.phase) {
+    case "armed":
+      return state.recorder.recording ? "recording... stop moving to finish" : "armed: swing out like a peek, then stop";
+    case "waiting":
+    case "peeking":
+    case "fighting":
+    case "gap":
+      return settings.loop ? "looping, !stop to end" : "playing";
+    default:
+      if (!state.holder) return "stand on your angle and type !hold";
+      if (!state.peek) return "walk behind cover, type !rec and swing out";
+      return "!play or !loop to start, !help for all commands";
+  }
 }
 
-const help = [
-  "!hold: holding spot = where you stand and look now",
-  "!rec: then swing out like a peek, recording stops when you stop moving",
-  "!play / !loop / !stop",
-  "!mode move|teleport|velocity  !shoot off|hybrid|fake  !speed 0.5-2",
-  "!react <ms>  !acc <0-1>  !god on|off  !bot  !dump  !status",
-];
+function drawOverlay(now: number) {
+  const peek = state.peek ? `${state.peek.samples.length} ticks` : "none";
+  const lines: [string, typeof WHITE][] = [
+    [`defrag spike: ${phaseHint()}`, YELLOW],
+    [
+      `mode ${settings.move} | shoot ${settings.shoot} | speed ${settings.speed} | react ${settings.reactMs} ms | ` +
+        `acc ${settings.accuracy} | god ${settings.god ? "on" : "off"} | hold ${state.holder ? "set" : "none"} | peek ${peek}`,
+      GREY,
+    ],
+  ];
+  if (now < helpUntil) for (const line of help) lines.push([line, WHITE]);
+  for (const message of recentMessages(now, 8)) lines.push([message, WHITE]);
+  lines.forEach(([text, color], i) => Instance.DebugScreenText({ text, x: OVERLAY_X, y: OVERLAY_Y + i * LINE, color }));
+}
+
+function schedule() {
+  const now = Instance.GetGameTime();
+  try {
+    tick();
+    flushChat(now);
+    drawOverlay(now);
+  } catch (error) {
+    Console.Log(`[defrag] tick failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
+  }
+  Instance.SetNextThink(now + TICK);
+}
 
 function status() {
   const peek = state.peek ? `${state.peek.samples.length} ticks` : "none";
@@ -254,6 +298,7 @@ function onCommand(name: string, args: string[]) {
   const arg = args[0] ?? "";
   switch (name) {
     case "help":
+      helpUntil = Instance.GetGameTime() + 15;
       return help.forEach(tell);
     case "hold":
       if (!h) return tell("spawn first");
