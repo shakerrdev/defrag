@@ -27,7 +27,7 @@ function Get-Repo {
     if (Test-Path (Join-Path $candidate 'pnpm-workspace.yaml')) {
       Ok "using the repo at $candidate"
       if ((Test-Path (Join-Path $candidate '.git')) -and (Get-Command git.exe -ErrorAction SilentlyContinue)) {
-        git -C $candidate pull --ff-only
+        git -C $candidate pull --ff-only | Out-Host
         if ($LASTEXITCODE -ne 0) { Warn 'git pull failed, continuing with the local version' }
       }
       return $candidate
