@@ -133,7 +133,7 @@ function Write-SpikeConfig($cs2) {
   $lines = @(
     '// written by the defrag setup script: loads the bot peek spike into the running map',
     'sv_cheats 1',
-    'ent_create point_script targetname defrag_spike cs_script maps/scripts/spike.vjs'
+    'ent_create point_script { "targetname" "defrag_spike" "cs_script" "maps/scripts/spike.vjs" }'
   )
   Set-Content $cfg $lines -Encoding ASCII
   Ok "wrote $cfg"
