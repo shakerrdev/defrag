@@ -8,6 +8,8 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
   "files": ["node_modules/v8_scripting/types/point_script.d.ts"],
