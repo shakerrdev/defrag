@@ -5,7 +5,8 @@
   "scripts": {
     "build": "node build.ts",
     "watch": "node build.ts --watch",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\""
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
