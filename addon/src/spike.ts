@@ -9,7 +9,7 @@ import {
   type QAngle,
 } from "cs_script/point_script";
 import { flushChat, parseCommand, recentMessages, tell } from "./spike/chat.ts";
-import { add, distance, lookAt, randomBetween, round, ZERO } from "./spike/math.ts";
+import { add, distance, lookAt, randomBetween, round, speed2d, ZERO } from "./spike/math.ts";
 import { Recorder, sampleAt, sampleOf, type Holder, type Peek } from "./spike/peek.ts";
 
 type MoveMode = "move" | "teleport" | "velocity";
@@ -22,6 +22,8 @@ const DRIFT_LIMIT = 24;
 const MAX_TURN_PER_TICK = 15;
 const ON_TARGET_DEGREES = 2;
 const HEAD_OFFSET = { x: 0, y: 0, z: -2 };
+const STOPPED_SPEED = 60;
+const BURST_RESET_SECONDS = 0.35;
 
 const settings = {
   move: "move" as MoveMode,
@@ -49,6 +51,9 @@ const state = {
   nextShotAt: 0,
   aim: undefined as QAngle | undefined,
   triggerAllowed: undefined as boolean | undefined,
+  burstShots: 0,
+  burstLimit: 1,
+  burstResetUntil: 0,
   lastHitGroup: undefined as CSHitGroup | undefined,
 };
 
@@ -208,6 +213,8 @@ function startRep() {
   state.visibleAt = undefined;
   state.aim = undefined;
   state.lastHitGroup = undefined;
+  state.burstShots = 0;
+  state.burstResetUntil = 0;
   applySample(b, 0, true);
   debug(`rep start, shoot ${settings.shoot}, move ${settings.move}, react ${settings.reactMs} ms`);
   setPhase("waiting", randomBetween(settings.delayMin, settings.delayMax));
@@ -236,6 +243,21 @@ function fakeShot(h: CSPlayerPawn, b: CSPlayerPawn) {
 
 let engageTicks = 0;
 
+function burstFor(range: number) {
+  if (range > 1200) return 1;
+  if (range > 500) return 3;
+  return 5;
+}
+
+function countBotShot(now: number) {
+  if (settings.shoot !== "assist") return;
+  state.burstShots++;
+  if (state.burstShots < state.burstLimit) return;
+  state.burstShots = 0;
+  state.burstResetUntil = now + BURST_RESET_SECONDS;
+  setBotTrigger(false);
+}
+
 function engage(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
   if (settings.shoot === "off" || state.visibleAt === undefined) return;
   const visible = canSee(b, h);
@@ -251,7 +273,11 @@ function engage(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
   }
   if (settings.shoot === "hybrid" || now < state.visibleAt + settings.reactMs / 1000 || !visible) return;
   const error = aimStep(b, h);
-  if (settings.shoot === "assist") return setBotTrigger(error <= ON_TARGET_DEGREES);
+  if (settings.shoot === "assist") {
+    const stopped = speed2d(b.GetAbsVelocity()) < STOPPED_SPEED;
+    if (!state.triggerAllowed) state.burstLimit = burstFor(distance(eye(b), eye(h)));
+    return setBotTrigger(error <= ON_TARGET_DEGREES && stopped && now >= state.burstResetUntil);
+  }
   if (error > ON_TARGET_DEGREES || now < state.nextShotAt) return;
   state.nextShotAt = now + settings.fireInterval;
   fakeShot(h, b);
@@ -441,6 +467,7 @@ function onCommand(name: string, args: string[]) {
 Instance.OnGunFire(({ weapon }) => {
   const owner = weapon.GetOwner();
   if (owner && owner === bot()) {
+    countBotShot(Instance.GetGameTime());
     debug(`bot fired ${weapon.GetData().GetName()}, clip ${weapon.GetClipAmmo()}, aim ${JSON.stringify(owner.GetEyeAngles())}`);
   }
 });

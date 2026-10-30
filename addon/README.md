@@ -9,7 +9,7 @@ Map scripts for the defrag Workshop addon. Every `src/*.ts` file is one script; 
 - **Movement:** `move` (`Entity.Move`, keeps the client's interpolation), `teleport` (`Entity.Teleport` every tick) or `velocity` (sets only velocity and corrects drift over 24 units).
 - **Shooting back:**
   - `fake`: after the reaction time the script turns the bot's aim smoothly onto you (max 15° per tick) and applies damage with a set hit chance. Silent: no sound, muzzle flash or tracer, because the API has no way to fire a weapon or play effects.
-  - `assist`: the script aims (reaction time and smooth flick as in `fake`) while the bot is unfrozen with its AI trigger off (`bot_dont_shoot 1`); once the aim is on target the trigger is switched on and the AI fires real shots itself. Bots ignore `+attack` sent from a script, frozen or not, so a script can't fire a weapon directly.
+  - `assist`: the script aims (reaction time and smooth flick as in `fake`) while the bot is unfrozen with its AI trigger off (`bot_dont_shoot 1`); once the aim is on target and the bot is nearly stopped (under 60 u/s) the trigger is switched on and the AI fires real shots itself, in bursts by range (1 shot beyond 1200 units, 3 beyond 500, else 5) with a 0.35 s reset, since a script can't see or compensate recoil. Bots ignore `+attack` sent from a script, frozen or not, so a script can't fire a weapon directly.
   - `hybrid`: the bot is unfrozen for the peek and the game's bot AI aims and shoots for real, while the script keeps moving it along the recorded path.
   - `off`.
 
