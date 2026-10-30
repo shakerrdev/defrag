@@ -13,7 +13,7 @@ import { add, distance, lookAt, randomBetween, round, ZERO } from "./spike/math.
 import { Recorder, sampleAt, sampleOf, type Holder, type Peek } from "./spike/peek.ts";
 
 type MoveMode = "move" | "teleport" | "velocity";
-type ShootMode = "off" | "hybrid" | "fake" | "input";
+type ShootMode = "off" | "hybrid" | "fake" | "assist";
 type Phase = "idle" | "armed" | "waiting" | "peeking" | "fighting" | "gap";
 
 const TICK = 1 / 64;
@@ -48,7 +48,7 @@ const state = {
   visibleAt: undefined as number | undefined,
   nextShotAt: 0,
   aim: undefined as QAngle | undefined,
-  releaseTriggerAt: undefined as number | undefined,
+  triggerAllowed: undefined as boolean | undefined,
   lastHitGroup: undefined as CSHitGroup | undefined,
 };
 
@@ -81,9 +81,16 @@ function setBotFrozen(frozen: boolean) {
   Console.ServerCommand(`bot_stop ${frozen ? 1 : 0}`);
 }
 
+function setBotTrigger(allowed: boolean) {
+  if (state.triggerAllowed === allowed) return;
+  state.triggerAllowed = allowed;
+  Console.ServerCommand(`bot_dont_shoot ${allowed ? 0 : 1}`);
+  debug(`bot trigger ${allowed ? "on" : "off"}`);
+}
+
 function releaseBotForShooting() {
-  if (settings.shoot !== "hybrid" && settings.shoot !== "input") return;
-  Console.ServerCommand(`bot_dont_shoot ${settings.shoot === "input" ? 1 : 0}`);
+  if (settings.shoot !== "hybrid" && settings.shoot !== "assist") return;
+  setBotTrigger(settings.shoot === "hybrid");
   setBotFrozen(false);
 }
 
@@ -146,7 +153,7 @@ function canSee(viewer: CSPlayerPawn, target: CSPlayerPawn) {
 
 function aimTakenOver() {
   if (state.visibleAt === undefined) return false;
-  return settings.shoot === "fake" || settings.shoot === "input" || settings.shoot === "hybrid";
+  return settings.shoot === "fake" || settings.shoot === "assist" || settings.shoot === "hybrid";
 }
 
 function applySample(pawn: CSPlayerPawn, index: number, still = false) {
@@ -182,25 +189,6 @@ function aimStep(b: CSPlayerPawn, h: CSPlayerPawn) {
   return error * (1 - t);
 }
 
-function botSlot() {
-  return botController()?.GetPlayerSlot();
-}
-
-function pressTrigger(now: number) {
-  const slot = botSlot();
-  if (slot === undefined) return;
-  Console.ClientCommand(slot, "+attack");
-  debug(`+attack to slot ${slot}`);
-  state.releaseTriggerAt = now + 2 * TICK;
-}
-
-function releaseTrigger(now: number, force = false) {
-  if (state.releaseTriggerAt === undefined || (!force && now < state.releaseTriggerAt)) return;
-  const slot = botSlot();
-  if (slot !== undefined) Console.ClientCommand(slot, "-attack");
-  debug(`-attack to slot ${slot}`);
-  state.releaseTriggerAt = undefined;
-}
 
 function startRep() {
   const h = human();
@@ -227,7 +215,7 @@ function startRep() {
 
 function endRep(result: string) {
   debug(`rep end: ${result}`);
-  releaseTrigger(Instance.GetGameTime(), true);
+  setBotTrigger(false);
   setBotFrozen(true);
   tell(result);
   if (settings.loop) setPhase("gap", 1);
@@ -263,11 +251,10 @@ function engage(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
   }
   if (settings.shoot === "hybrid" || now < state.visibleAt + settings.reactMs / 1000 || !visible) return;
   const error = aimStep(b, h);
+  if (settings.shoot === "assist") return setBotTrigger(error <= ON_TARGET_DEGREES);
   if (error > ON_TARGET_DEGREES || now < state.nextShotAt) return;
-  debug(`shot due, mode ${settings.shoot}, aim error ${error.toFixed(2)}`);
   state.nextShotAt = now + settings.fireInterval;
-  if (settings.shoot === "fake") fakeShot(h, b);
-  else pressTrigger(now);
+  fakeShot(h, b);
 }
 
 function trackVisibility(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
@@ -298,7 +285,6 @@ function tick() {
     }
   } else if (state.phase === "peeking" || state.phase === "fighting") {
     if (!b || !h) return endRep(b ? "you died" : "bot died");
-    releaseTrigger(now);
     trackVisibility(b, h, now);
     const last = state.peek!.samples.length - 1;
     if (state.phase === "peeking") {
@@ -318,7 +304,7 @@ function tick() {
 
 const help = [
   "!hold = holding spot, !rec = record a peek (swing out, then stop), !play / !loop / !stop",
-  "!mode move|teleport|velocity, !shoot fake|input|hybrid|off, !speed 0.25-2",
+  "!mode move|teleport|velocity, !shoot fake|assist|hybrid|off, !speed 0.25-2",
   "!react <ms>, !acc <0-1>, !god on|off, !bot, !status, !dump",
 ];
 
@@ -427,7 +413,7 @@ function onCommand(name: string, args: string[]) {
       settings.move = arg as MoveMode;
       return status();
     case "shoot":
-      if (!["off", "hybrid", "fake", "input"].includes(arg)) return tell("shoot: fake, input, hybrid or off");
+      if (!["off", "hybrid", "fake", "assist"].includes(arg)) return tell("shoot: fake, assist, hybrid or off");
       settings.shoot = arg as ShootMode;
       return status();
     case "speed":
