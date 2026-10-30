@@ -13,7 +13,7 @@ const entryPoints = readdirSync(join(root, "src"))
 
 function copyToAddon(files: string[]) {
   if (!addonDir) return;
-  const target = join(addonDir, "scripts");
+  const target = join(addonDir, "maps", "scripts");
   mkdirSync(target, { recursive: true });
   for (const file of files) {
     copyFileSync(file, join(target, file.slice(outdir.length + 1)));

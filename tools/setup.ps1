@@ -129,7 +129,7 @@ function Write-SpikeConfig($cs2) {
   $lines = @(
     '// written by the defrag setup script: loads the bot peek spike into the running map',
     'sv_cheats 1',
-    'ent_create point_script targetname defrag_spike cs_script scripts/spike.vjs'
+    'ent_create point_script targetname defrag_spike cs_script maps/scripts/spike.vjs'
   )
   Set-Content $cfg $lines -Encoding ASCII
   Ok "wrote $cfg"
@@ -137,19 +137,30 @@ function Write-SpikeConfig($cs2) {
 
 function Compile-Scripts($cs2, $addonContent) {
   $compiler = Join-Path $cs2 'game\bin\win64\resourcecompiler.exe'
-  if (-not (Test-Path $compiler)) { return }
+  if (-not (Test-Path $compiler)) {
+    Warn "no resource compiler at ${compiler}, reinstall the Workshop Tools DLC, then run this again"
+    return
+  }
   $log = Join-Path $Home_ 'resourcecompiler.log'
-  foreach ($script in Get-ChildItem (Join-Path $addonContent 'scripts') -Filter *.js) {
+  New-Item -ItemType Directory -Force $Home_ | Out-Null
+  Set-Content $log '' -Encoding utf8
+  $failed = 0
+  foreach ($script in Get-ChildItem (Join-Path $addonContent 'maps\scripts') -Filter *.js) {
+    $compiled = Join-Path $cs2 "game\csgo_addons\$AddonName\maps\scripts\$($script.BaseName).vjs_c"
+    if (Test-Path $compiled) { Remove-Item $compiled -Force }
+    "== $($script.FullName)" | Out-File $log -Append -Encoding utf8
     $ErrorActionPreference = 'Continue'
-    & $compiler -i $script.FullName *> $log
+    & $compiler -i $script.FullName 2>&1 | Out-File $log -Append -Encoding utf8
     $ErrorActionPreference = 'Stop'
-    $compiled = Join-Path $cs2 "game\csgo_addons\$AddonName\scripts\$($script.BaseName).vjs_c"
     if (Test-Path $compiled) {
       Ok "compiled $($script.Name)"
     } else {
-      Warn "couldn't precompile $($script.Name) (see $log); the tools compile it when it is first loaded"
+      $failed++
+      Warn "compiling $($script.Name) failed, last compiler output:"
+      Get-Content $log -Tail 15 | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkYellow }
     }
   }
+  if ($failed) { Warn "full log: $log" }
 }
 
 function Main {
@@ -182,14 +193,20 @@ function Main {
     Step "Creating the '$AddonName' addon"
     $addonContent = Join-Path $cs2 "content\csgo_addons\$AddonName"
     $addonGame = Join-Path $cs2 "game\csgo_addons\$AddonName"
-    New-Item -ItemType Directory -Force (Join-Path $addonContent 'scripts'), (Join-Path $addonContent 'maps'), $addonGame | Out-Null
+    New-Item -ItemType Directory -Force (Join-Path $addonContent 'maps\scripts'), $addonGame | Out-Null
+    $oldScripts = Join-Path $addonContent 'scripts'
+    if (Test-Path $oldScripts) { Remove-Item $oldScripts -Recurse -Force }
     Ok $addonContent
 
     Step 'Building the map scripts'
     $env:CS2_ADDON_DIR = $addonContent
     pnpm --filter @defrag/addon build
     if ($LASTEXITCODE -ne 0) { throw 'building the scripts failed' }
-    if ($hasTools) { Compile-Scripts $cs2 $addonContent }
+    if ($hasTools) {
+      Compile-Scripts $cs2 $addonContent
+    } else {
+      Warn 'scripts not compiled because the Workshop Tools are missing: run this again once they are installed'
+    }
     Write-SpikeConfig $cs2
 
     Step 'Done'
@@ -197,7 +214,7 @@ function Main {
     Info '2. In the console: map de_dust2   (any map with spawns and a nav mesh works)'
     Info '3. Join CT, then in the console: exec defrag_spike'
     Info '4. Chat should say "[defrag] spike loaded". Type !help in chat.'
-    Info 'No message? Place a point_script with cs_script = scripts/spike.vjs in a map in Hammer instead (addon\README.md).'
+    Info 'No message? Place a point_script with cs_script = maps/scripts/spike.vjs in a map in Hammer instead (addon\README.md).'
     Info "While editing the scripts, run $(Join-Path $repo 'watch.cmd') to rebuild and copy them on every save."
 
     if ($Watch) {

@@ -1,6 +1,6 @@
 # addon
 
-Map scripts for the defrag Workshop addon. Every `src/*.ts` file is one script; `pnpm build:addon` bundles each into `dist/scripts/<name>.js` (and into `$CS2_ADDON_DIR/scripts/` when that is set). In Hammer a `point_script` entity points at it as `scripts/<name>.vjs`.
+Map scripts for the defrag Workshop addon. Every `src/*.ts` file is one script; `pnpm build:addon` bundles each into `dist/scripts/<name>.js` (and into `$CS2_ADDON_DIR/maps/scripts/` when that is set, the same layout as Valve's `cs_script_demo` addon). The Workshop Tools compile each into `<name>.vjs_c`, and a `point_script` entity points at it as `maps/scripts/<name>.vjs`.
 
 ## Spike: can a script make a bot peek like a player?
 
@@ -13,14 +13,14 @@ The bot stays frozen with `bot_stop 1` while the script moves it.
 
 ### Setting it up
 
-Run the setup from the main README (`setup.cmd` or the PowerShell one-liner). It creates the `defrag` addon, builds the scripts into it and writes `game/csgo/cfg/defrag_spike.cfg`. Then:
+Run the setup from the main README (`setup.cmd` or the PowerShell one-liner). It creates the `defrag` addon, builds the scripts into it, compiles them with the Workshop Tools' resource compiler and writes `game/csgo/cfg/defrag_spike.cfg`. Install the Workshop Tools first (or run the setup again after installing them), otherwise there is nothing to compile with and the game reports "Failed to load cs_script". Then:
 
 1. Start **Counter-Strike 2 Workshop Tools** with the `defrag` addon.
 2. Load a real map: `map de_dust2` in the console.
-3. Join CT and run `exec defrag_spike`. It spawns a `point_script` running `scripts/spike.vjs` (needs `sv_cheats 1`, which the config sets).
+3. Join CT and run `exec defrag_spike`. It spawns a `point_script` running `maps/scripts/spike.vjs` (needs `sv_cheats 1`, which the config sets).
 4. Chat should say `[defrag] spike loaded`; the script sets up the server and adds a bot on the other team.
 
-If no message appears, spawning the script from the console doesn't work (that step is unverified). Use a map instead: in Hammer, open or make a map in the addon with a corner to peek around, T and CT spawns and a nav mesh (bots may not spawn without one), add a `point_script` entity with **cs_script** set to `scripts/spike.vjs`, then build and run it (F9).
+If no message appears, spawning the script from the console doesn't work (that step is unverified). Use a map instead: in Hammer, open or make a map in the addon with a corner to peek around, T and CT spawns and a nav mesh (bots may not spawn without one), add a `point_script` entity with **cs_script** set to `maps/scripts/spike.vjs`, then build and run it (F9).
 
 Manual alternative to the setup script: `pnpm install`, then `pnpm watch:addon` with `CS2_ADDON_DIR` set to the addon's content folder (`…/Counter-Strike Global Offensive/content/csgo_addons/defrag`).
 
