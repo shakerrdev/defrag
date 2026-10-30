@@ -81,7 +81,12 @@ function setBotFrozen(frozen: boolean) {
   Console.ServerCommand(`bot_stop ${frozen ? 1 : 0}`);
 }
 
+function debug(message: string) {
+  Console.Log(`[defrag:debug] t=${Instance.GetGameTime().toFixed(3)} ${message}`);
+}
+
 function setupServer() {
+  Console.SetConvar("con_logfile", "defrag_console.log");
   Console.SetConvar("mp_ignore_round_win_conditions", true);
   Console.SetConvar("mp_roundtime", 60);
   Console.SetConvar("mp_freezetime", 0);
@@ -166,6 +171,7 @@ function pressTrigger(now: number) {
   const slot = botSlot();
   if (slot === undefined) return;
   Console.ClientCommand(slot, "+attack");
+  debug(`+attack to slot ${slot}`);
   state.releaseTriggerAt = now + 2 * TICK;
 }
 
@@ -173,6 +179,7 @@ function releaseTrigger(now: number, force = false) {
   if (state.releaseTriggerAt === undefined || (!force && now < state.releaseTriggerAt)) return;
   const slot = botSlot();
   if (slot !== undefined) Console.ClientCommand(slot, "-attack");
+  debug(`-attack to slot ${slot}`);
   state.releaseTriggerAt = undefined;
 }
 
@@ -223,6 +230,7 @@ function engage(b: CSPlayerPawn, h: CSPlayerPawn, now: number) {
   if (state.visibleAt === undefined || now < state.visibleAt + settings.reactMs / 1000 || !canSee(b, h)) return;
   const error = aimStep(b, h);
   if (error > ON_TARGET_DEGREES || now < state.nextShotAt) return;
+  debug(`shot due, mode ${settings.shoot}, aim error ${error.toFixed(2)}`);
   state.nextShotAt = now + settings.fireInterval;
   if (settings.shoot === "fake") fakeShot(h, b);
   else pressTrigger(now);
@@ -407,6 +415,13 @@ function onCommand(name: string, args: string[]) {
       return status();
   }
 }
+
+Instance.OnGunFire(({ weapon }) => {
+  const owner = weapon.GetOwner();
+  if (owner && owner === bot()) {
+    debug(`bot fired ${weapon.GetData().GetName()}, clip ${weapon.GetClipAmmo()}, aim ${JSON.stringify(owner.GetEyeAngles())}`);
+  }
+});
 
 Instance.OnPlayerChat(({ player, text }) => {
   if (!player || player.IsBot()) return;
