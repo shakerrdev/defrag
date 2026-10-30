@@ -24,7 +24,17 @@ Early. The first step is a spike that answers the one question the whole project
 
 Not in this repo, on purpose: decompiled official maps and other Valve assets, demos, and generated scenario packs. They stay local or go into releases.
 
-## Setup
+## Quick setup (Windows)
+
+Paste this into PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/shakerrdev/defrag/main/tools/setup.ps1 | iex
+```
+
+or double-click `setup.cmd` in a clone. It finds CS2 through Steam, checks for the Workshop Tools, downloads the code (when not run from a clone), gets a private copy of Node and pnpm if needed, creates the `defrag` addon, builds the map scripts into it, writes a `defrag_spike` console config and offers to start the Workshop Tools. Run it again any time to update. `watch.cmd` does the same and then rebuilds on every save. Options: `-Cs2Path <folder>` if CS2 isn't found, `-Launch` to start the tools without asking.
+
+## Development setup
 
 Needs Node 22.18+ and pnpm 10, plus CS2 with the Counter-Strike 2 Workshop Tools for running anything in game.
 

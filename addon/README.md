@@ -13,17 +13,18 @@ The bot stays frozen with `bot_stop 1` while the script moves it.
 
 ### Setting it up
 
-1. Start **Counter-Strike 2 Workshop Tools** and create an addon called `defrag`.
-2. In this repo: `pnpm install`, then run the watcher with `CS2_ADDON_DIR` set to the addon's content folder (`…/Counter-Strike Global Offensive/content/csgo_addons/defrag`), e.g. in PowerShell:
-   ```powershell
-   $env:CS2_ADDON_DIR = "C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\content\csgo_addons\defrag"
-   pnpm watch:addon
-   ```
-3. Make a test map in Hammer with a corner or doorway to peek around, a T and a CT spawn, and a nav mesh (bots may not spawn without one). Valve's `script_zoo` map (`content/csgo/maps/editor/zoo/`) saved into the addon is an alternative.
-4. Add a `point_script` entity with **cs_script** set to `scripts/spike.vjs`.
-5. Build and run the map (F9). The script sets up the server and adds a bot on the other team.
+Run the setup from the main README (`setup.cmd` or the PowerShell one-liner). It creates the `defrag` addon, builds the scripts into it and writes `game/csgo/cfg/defrag_spike.cfg`. Then:
 
-Saving the script while the map runs reloads it (tools mode).
+1. Start **Counter-Strike 2 Workshop Tools** with the `defrag` addon.
+2. Load a real map: `map de_dust2` in the console.
+3. Join CT and run `exec defrag_spike`. It spawns a `point_script` running `scripts/spike.vjs` (needs `sv_cheats 1`, which the config sets).
+4. Chat should say `[defrag] spike loaded`; the script sets up the server and adds a bot on the other team.
+
+If no message appears, spawning the script from the console doesn't work (that step is unverified). Use a map instead: in Hammer, open or make a map in the addon with a corner to peek around, T and CT spawns and a nav mesh (bots may not spawn without one), add a `point_script` entity with **cs_script** set to `scripts/spike.vjs`, then build and run it (F9).
+
+Manual alternative to the setup script: `pnpm install`, then `pnpm watch:addon` with `CS2_ADDON_DIR` set to the addon's content folder (`…/Counter-Strike Global Offensive/content/csgo_addons/defrag`).
+
+With `watch.cmd` (or `pnpm watch:addon`) running, saving a script rebuilds it and the tools reload it in the running map.
 
 ### Using it
 
