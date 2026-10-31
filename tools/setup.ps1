@@ -185,6 +185,50 @@ function Get-Decompiler {
   return $cli
 }
 
+function Get-ScenarioCounts($addonContent) {
+  $counts = @{}
+  $packs = Join-Path $addonContent 'scenario-packs'
+  if (-not (Test-Path $packs)) { return $counts }
+  foreach ($file in Get-ChildItem $packs -Filter *.json) {
+    $text = [IO.File]::ReadAllText($file.FullName)
+    $counts[$file.BaseName] = ([regex]::Matches($text, '"contactFrame"')).Count
+  }
+  return $counts
+}
+
+function Select-Maps($cs2, $addonContent) {
+  $mapsDir = Join-Path $cs2 'game\csgo\maps'
+  $official = @(Get-ChildItem $mapsDir -Filter '*.vpk' -ErrorAction SilentlyContinue |
+    Where-Object { $_.BaseName -match '^(de|cs|ar)_[a-z0-9]+$' -and $_.BaseName -notmatch '_vanity$' } |
+    ForEach-Object { $_.BaseName } | Sort-Object)
+  if (-not $official.Count) { return @() }
+  $counts = Get-ScenarioCounts $addonContent
+  $made = Join-Path $addonContent 'maps'
+  $official = @($official | Sort-Object { -1 * [int]($counts[$_]) }, { $_ })
+
+  Step 'Which defrag maps should be made? (custom HUD + clickable menu, needs a Hammer build afterwards)'
+  for ($i = 0; $i -lt $official.Count; $i++) {
+    $name = $official[$i]
+    $n = [int]$counts[$name]
+    $label = if ($n) { "$n scenarios" } else { 'no scenarios yet' }
+    $done = if (Test-Path (Join-Path $made "defrag_$name.vmap")) { ', already made' } else { '' }
+    $color = if ($done) { 'DarkGray' } elseif ($n) { 'White' } else { 'DarkGray' }
+    Write-Host ('    {0,2}. {1,-14} {2}{3}' -f ($i + 1), $name, $label, $done) -ForegroundColor $color
+  }
+  Info 'Numbers separated by commas or spaces (e.g. 1,3), "a" = every map with scenarios that isn''t made yet, Enter = none.'
+  $answer = Read-Host '    Maps'
+  if (-not $answer.Trim()) { return @() }
+  if ($answer.Trim() -match '^[aA]') {
+    return @($official | Where-Object { [int]$counts[$_] -gt 0 -and -not (Test-Path (Join-Path $made "defrag_$_.vmap")) })
+  }
+  $picked = foreach ($token in ($answer -split '[,\s]+' | Where-Object { $_ })) {
+    if ($token -match '^\d+$' -and [int]$token -ge 1 -and [int]$token -le $official.Count) { $official[[int]$token - 1] }
+    elseif ($official -contains $token) { $token }
+    else { Warn "ignoring '$token'" }
+  }
+  return @($picked | Select-Object -Unique)
+}
+
 function Build-MapSource($cs2, $repo, $addonContent, $name) {
   $vpk = Join-Path $cs2 "game\csgo\maps\$name.vpk"
   if (-not (Test-Path $vpk)) { Warn "no $vpk, skipping $name"; return }
@@ -312,14 +356,16 @@ function Main {
       Warn 'scripts not compiled because the Workshop Tools are missing: run this again once they are installed'
     }
     Write-ScriptConfig $cs2 'defrag' 'crossfire' 'the crossfire trainer'
-    if ($Map.Count) {
-      Step "Making the defrag map(s): $($Map -join ', ')"
-      foreach ($name in $Map) { Build-MapSource $cs2 $repo $addonContent $name }
+    $chosen = @($Map)
+    if (-not $chosen.Count -and -not $Watch) { $chosen = @(Select-Maps $cs2 $addonContent) }
+    if ($chosen.Count) {
+      Step "Making the defrag map(s): $($chosen -join ', ')"
+      foreach ($name in $chosen) { Build-MapSource $cs2 $repo $addonContent $name }
     }
     Write-ScriptConfig $cs2 'defrag_spike' 'spike' 'the bot peek spike'
 
     Step 'Done'
-    foreach ($name in $Map) {
+    foreach ($name in $chosen) {
       Info "Map defrag_${name}: in the Workshop Tools open Hammer, File > Open > maps/defrag_$name.vmap,"
       Info "  then Build (F9) with 'Build lighting' set to Fast (or off for a quick first try), then in the console: map defrag_$name"
       Info "  The map already contains the crossfire script and the custom HUD, so no exec defrag there; !menu should open the clickable menu."
