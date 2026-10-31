@@ -2,39 +2,41 @@
   <styles>
     <include src="file://{resources}/styles/custom_game/defrag.css" />
   </styles>
-  <Panel id="defrag" class="DefragRoot" hittest="false">
-    <Panel id="card" class="Card" hittest="false">
-      <Label id="title" class="Title" text="{s:title}" hittest="false" />
-      <Label id="info" class="Info" text="{s:info}" hittest="false" />
-      <Label id="session" class="Session" text="{s:session}" hittest="false" />
-      <Label id="result" class="Result Hidden" text="{s:result}" hittest="false" />
-      <Label id="messages" class="Messages" text="{s:messages}" hittest="false" />
-    </Panel>
-    <Panel id="menu" class="Menu Hidden">
-      <Label class="MenuTitle" text="defrag crossfire" />
-      <Label class="MenuInfo" text="{s:menu_info}" />
-      <Panel class="MenuRow">
-        <Button id="btn_start" class="MenuButton Primary"><Label text="Start" /></Button>
-        <Button id="btn_set" class="MenuButton Primary"><Label text="Set of 20" /></Button>
-        <Button id="btn_stop" class="MenuButton"><Label text="Stop" /></Button>
-        <Button id="btn_skip" class="MenuButton"><Label text="Skip" /></Button>
+  <Panel class="DefragRoot" hittest="false">
+    <Panel id="defrag" class="DefragRoot" hittest="false">
+      <Panel id="card" class="Card" hittest="false">
+        <Label id="title" class="Title" text="{s:title}" hittest="false" />
+        <Label id="info" class="Info" text="{s:info}" hittest="false" />
+        <Label id="session" class="Session" text="{s:session}" hittest="false" />
+        <Label id="result" class="Result Hidden" text="{s:result}" hittest="false" />
+        <Label id="messages" class="Messages" text="{s:messages}" hittest="false" />
       </Panel>
-      <Panel class="MenuRow">
-        <Button id="btn_diff" class="MenuButton Wide"><Label text="Difficulty: {s:menu_diff}" /></Button>
-        <Button id="btn_tier" class="MenuButton Wide"><Label text="Scenarios: {s:menu_tier}" /></Button>
+      <Panel id="menu" class="Menu Hidden">
+        <Label class="MenuTitle" text="defrag crossfire" />
+        <Label class="MenuInfo" text="{s:menu_info}" />
+        <Panel class="MenuRow">
+          <Button id="btn_start" class="MenuButton Primary"><Label text="Start" /></Button>
+          <Button id="btn_set" class="MenuButton Primary"><Label text="Set of 20" /></Button>
+          <Button id="btn_stop" class="MenuButton"><Label text="Stop" /></Button>
+          <Button id="btn_skip" class="MenuButton"><Label text="Skip" /></Button>
+        </Panel>
+        <Panel class="MenuRow">
+          <Button id="btn_diff" class="MenuButton Wide"><Label text="Difficulty: {s:menu_diff}" /></Button>
+          <Button id="btn_tier" class="MenuButton Wide"><Label text="Scenarios: {s:menu_tier}" /></Button>
+        </Panel>
+        <Panel class="MenuRow">
+          <Button id="btn_focus" class="MenuButton Wide"><Label text="Focus: {s:menu_focus}" /></Button>
+          <Button id="btn_shoot" class="MenuButton Wide"><Label text="Bot shoots: {s:menu_shoot}" /></Button>
+        </Panel>
+        <Panel class="MenuRow">
+          <Button id="btn_gun" class="MenuButton Wide"><Label text="Your gun: {s:menu_gun}" /></Button>
+          <Button id="btn_weapons" class="MenuButton Wide"><Label text="Bot weapons: {s:menu_weapons}" /></Button>
+        </Panel>
+        <Panel class="MenuRow">
+          <Button id="btn_reset" class="MenuButton Wide"><Label text="Reset session" /></Button>
+        </Panel>
+        <Button id="btn_close" class="MenuButton Close"><Label text="Close" /></Button>
       </Panel>
-      <Panel class="MenuRow">
-        <Button id="btn_focus" class="MenuButton Wide"><Label text="Focus: {s:menu_focus}" /></Button>
-        <Button id="btn_shoot" class="MenuButton Wide"><Label text="Bot shoots: {s:menu_shoot}" /></Button>
-      </Panel>
-      <Panel class="MenuRow">
-        <Button id="btn_gun" class="MenuButton Wide"><Label text="Your gun: {s:menu_gun}" /></Button>
-        <Button id="btn_weapons" class="MenuButton Wide"><Label text="Bot weapons: {s:menu_weapons}" /></Button>
-      </Panel>
-      <Panel class="MenuRow">
-        <Button id="btn_reset" class="MenuButton Wide"><Label text="Reset session" /></Button>
-      </Panel>
-      <Button id="btn_close" class="MenuButton Close"><Label text="Close" /></Button>
     </Panel>
   </Panel>
 </root>
