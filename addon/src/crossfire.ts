@@ -50,6 +50,7 @@ const settings = {
   focus: false,
   gun: "rifle",
   hud: "auto" as "auto" | "custom" | "debug",
+  weapons: "all" as WeaponClass | "all",
   tier: "all" as Tier | "all",
   shoot: "assist" as ShootMode,
   delayMin: 0.6,
@@ -117,6 +118,18 @@ function customScenarios() {
   return (save.custom ??= {})[mapName()] ?? [];
 }
 
+type WeaponClass = "rifles" | "pistols" | "smgs" | "snipers";
+const WEAPON_CLASSES: WeaponClass[] = ["rifles", "pistols", "smgs", "snipers"];
+
+function weaponClass(weapon: string): WeaponClass | undefined {
+  const name = weapon.replace(/^weapon_/, "");
+  if (/^(ak47|m4a1|m4a1_silencer|galilar|famas|aug|sg556)$/.test(name)) return "rifles";
+  if (/^(awp|ssg08|scar20|g3sg1)$/.test(name)) return "snipers";
+  if (/^(mp9|mac10|mp7|mp5sd|ump45|p90|bizon)$/.test(name)) return "smgs";
+  if (/^(glock|hkp2000|usp_silencer|p250|tec9|fiveseven|cz75a|deagle|revolver|elite)$/.test(name)) return "pistols";
+  return undefined;
+}
+
 const expanded = new Map<string, Scenario[]>();
 let pool: { key: string; list: Scenario[] } | undefined;
 
@@ -132,10 +145,17 @@ function packScenarios(map: string) {
 function scenarios(): Scenario[] {
   const map = mapName();
   const custom = customScenarios();
-  const key = `${map}|${settings.tier}|${custom.length}`;
+  const key = `${map}|${settings.tier}|${settings.weapons}|${custom.length}`;
   if (pool?.key === key) return pool.list;
   const all = [...packScenarios(map), ...custom];
-  pool = { key, list: settings.tier === "all" ? all : all.filter((s) => s.tier === settings.tier) };
+  pool = {
+    key,
+    list: all.filter(
+      (s) =>
+        (settings.tier === "all" || s.tier === settings.tier) &&
+        (settings.weapons === "all" || s.tier === "custom" || weaponClass(s.weapon) === settings.weapons),
+    ),
+  };
   return pool.list;
 }
 
@@ -494,7 +514,7 @@ function checkScenarios() {
 }
 
 const HELP = [
-  "!start / !stop / !skip, !diff auto|easy|normal|hard|pro, !tier all|pro|high|mid|low|custom",
+  "!start / !stop / !skip, !diff auto|easy|normal|hard|pro, !tier all|pro|high|mid|low|custom, !weapons all|rifles|pistols|smgs|snipers",
   "!menu (clickable settings), !gun rifle|ak47|m4a1_silencer|m4a1|awp|deagle|keep, !focus on|off, !worst, !hud auto|custom|debug",
   "!shoot assist|fake|off, !stats, !reset (session), !packs, !check (line of sight of every scenario)",
   "own peeks: stand on your angle + !hold, walk to the peek start + !rec, swing out and stop; !custom clear",
@@ -589,6 +609,11 @@ function onCommand(name: string, args: string[]) {
       settings.gun = arg;
       persist();
       return tell(`gun ${arg}`);
+    case "weapons":
+      if (arg !== "all" && !WEAPON_CLASSES.includes(arg as WeaponClass)) return tell(`weapons: all, ${WEAPON_CLASSES.join(", ")}`);
+      settings.weapons = arg as WeaponClass | "all";
+      persist();
+      return tell(`bot weapons ${arg}: ${scenarios().length} scenarios`);
     case "menu":
       return toggleMenu();
     case "hud":
@@ -672,6 +697,7 @@ function updateMenu() {
     menu_focus: settings.focus ? "on" : "off",
     menu_shoot: settings.shoot,
     menu_gun: settings.gun,
+    menu_weapons: settings.weapons,
   });
 }
 
@@ -687,6 +713,7 @@ const MENU_ACTIONS: Record<string, () => void> = {
   btn_focus: () => onCommand("focus", [settings.focus ? "off" : "on"]),
   btn_shoot: () => onCommand("shoot", [next(SHOOT_CYCLE, settings.shoot)]),
   btn_gun: () => onCommand("gun", [next(GUNS, settings.gun)]),
+  btn_weapons: () => onCommand("weapons", [next(["all", ...WEAPON_CLASSES], settings.weapons)]),
   btn_reset: () => onCommand("reset", []),
   btn_close: () => toggleMenu(false),
 };

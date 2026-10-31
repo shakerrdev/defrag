@@ -20,6 +20,7 @@ Scenarios come from `scenario-packs/*.json` bundled at build time (see the main 
 | `!worst` | The three scenarios you lose most (at least 2 reps each) |
 | `!gun rifle\|ak47\|m4a1_silencer\|m4a1\|awp\|deagle\|keep` | Weapon you get each rep (`rifle` = AK on T, M4A1-S on CT) |
 | `!tier all\|pro\|high\|mid\|low\|custom` | Which scenarios to use |
+| `!weapons all\|rifles\|pistols\|smgs\|snipers` | Only scenarios where the original peeker had that kind of weapon (your own peeks always count) |
 | `!shoot assist\|fake\|off` | `assist`: real shots from the AI trigger (default). `fake`: silent scripted damage. `off`: bot never shoots |
 | `!stats`, `!reset` | Session stats / reset them |
 | `!packs` | Bundled packs and how many are for this map |

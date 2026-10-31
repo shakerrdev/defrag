@@ -28,6 +28,9 @@
       </Panel>
       <Panel class="MenuRow">
         <Button id="btn_gun" class="MenuButton Wide"><Label text="Your gun: {s:menu_gun}" /></Button>
+        <Button id="btn_weapons" class="MenuButton Wide"><Label text="Bot weapons: {s:menu_weapons}" /></Button>
+      </Panel>
+      <Panel class="MenuRow">
         <Button id="btn_reset" class="MenuButton Wide"><Label text="Reset session" /></Button>
       </Panel>
       <Button id="btn_close" class="MenuButton Close"><Label text="Close" /></Button>
