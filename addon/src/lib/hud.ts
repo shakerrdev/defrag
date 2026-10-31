@@ -60,3 +60,21 @@ export function hideHud() {
   const hud = find();
   if (hud) setClass(hud, "card", "Hidden", true);
 }
+
+export function setMenuOpen(playerSlot: number, open: boolean) {
+  const hud = find();
+  if (!hud) return false;
+  hud.SetHasClassForPlayer(playerSlot, "menu", "Hidden", !open);
+  hud.SetInputCaptureEnabled(playerSlot, open);
+  return true;
+}
+
+export function setMenuText(values: Record<string, string>) {
+  const hud = find();
+  if (!hud) return;
+  for (const [key, value] of Object.entries(values)) set(hud, key, value);
+}
+
+export function isHud(entity: unknown) {
+  return entity !== undefined && entity === find();
+}

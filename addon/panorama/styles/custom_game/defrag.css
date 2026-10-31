@@ -26,6 +26,10 @@ Label {
   font-family: Stratum2, "Arial Unicode MS";
   color: #e2e9e5;
   font-size: 16px;
+}
+
+.Card Label,
+.Menu > Label {
   width: 100%;
 }
 
@@ -60,4 +64,76 @@ Label {
 
 .Hidden {
   opacity: 0;
+}
+
+.Menu {
+  horizontal-align: center;
+  vertical-align: center;
+  width: 560px;
+  flow-children: down;
+  padding: 20px 24px;
+  background-color: #0d1110f2;
+  border: 1px solid #e3b34b;
+  border-radius: 8px;
+  opacity: 1;
+  transition-property: opacity;
+  transition-duration: 0.1s;
+}
+
+.Menu.Hidden {
+  opacity: 0;
+  visibility: collapse;
+}
+
+.MenuTitle {
+  font-size: 26px;
+  font-weight: bold;
+  color: #e3b34b;
+}
+
+.MenuInfo {
+  font-size: 15px;
+  color: #93a29b;
+  margin-bottom: 10px;
+}
+
+.MenuRow {
+  width: 100%;
+  flow-children: right;
+  margin-top: 8px;
+}
+
+.MenuButton {
+  padding: 8px 14px;
+  margin-right: 8px;
+  border-radius: 4px;
+  background-color: #29332ebb;
+  transition-property: background-color;
+  transition-duration: 0.1s;
+}
+
+.MenuButton:hover {
+  background-color: #56645ebb;
+}
+
+.MenuButton Label {
+  font-size: 17px;
+}
+
+.MenuButton.Primary {
+  background-color: #1d7a4bdd;
+}
+
+.MenuButton.Primary:hover {
+  background-color: #2a9b62dd;
+}
+
+.MenuButton.Wide {
+  width: 250px;
+}
+
+.MenuButton.Close {
+  horizontal-align: right;
+  margin-top: 14px;
+  margin-right: 0;
 }

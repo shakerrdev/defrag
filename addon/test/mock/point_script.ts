@@ -14,6 +14,9 @@ export class CustomHudLayout extends Entity {
   classes = new Map<string, boolean>();
   SetDialogVariableString(panel: string, name: string, value: string) { this.vars.set(`${panel}.${name}`, value); }
   SetHasClass(panel: string, name: string, on?: boolean) { this.classes.set(`${panel}.${name}`, on ?? false); }
+  SetHasClassForPlayer(_slot: number, panel: string, name: string, on?: boolean) { this.classes.set(`${panel}.${name}`, on ?? false); }
+  capture = false;
+  SetInputCaptureEnabled(_slot: number, on: boolean) { this.capture = on; }
 }
 
 export class Pawn {
@@ -65,6 +68,7 @@ export class Controller {
   IsBot() { return this.bot; }
   GetPlayerPawn() { return this.pawn; }
   GetTeamNumber() { return this.team; }
+  GetPlayerSlot() { return this.bot ? 1 : 0; }
 }
 
 type Handlers = Record<string, ((e: any) => any)[]>;
@@ -130,6 +134,7 @@ export const Instance = {
   OnPlayerKill: on("PlayerKill"),
   OnPlayerActivate: on("PlayerActivate"),
   OnRoundStart: on("RoundStart"),
+  OnCustomHudClicked: on("CustomHudClicked"),
 };
 
 export const Console = {

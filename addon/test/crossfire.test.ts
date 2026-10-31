@@ -135,3 +135,15 @@ test("scenarios whose holding spot can't see the peek are skipped", () => {
   mock.wallBetween = false;
   mock.chat("!tier all");
 });
+
+test("the HUD menu opens with input capture and its buttons change settings", () => {
+  const hud = mock.entities.get("defrag_hud") as CustomHudLayout;
+  mock.chat("!menu");
+  assert.equal(hud.capture, true);
+  assert.equal(hud.classes.get("menu.Hidden"), false);
+  mock.emit("CustomHudClicked", { layout: hud, buttonId: "btn_diff" });
+  assert.equal(hud.vars.get("defrag.menu_diff"), "easy");
+  mock.emit("CustomHudClicked", { layout: hud, buttonId: "btn_close" });
+  assert.equal(hud.capture, false);
+  assert.equal(JSON.parse(mock.save).crossfire.settings.difficulty, "easy");
+});

@@ -26,7 +26,7 @@ import { flushChat, parseCommand, recentMessages, tell } from "./lib/chat.ts";
 import { add, distance, lookAt, randomBetween, speed2d, ZERO } from "./lib/math.ts";
 import { Recorder, sampleAt, sampleOf, type Peek } from "./lib/peek.ts";
 import { adapt, focusWeight, scaled, worst, type ScenarioRecord } from "./lib/adaptive.ts";
-import { drawHud, hideHud, hudAvailable, spawnHud } from "./lib/hud.ts";
+import { drawHud, hideHud, hudAvailable, isHud, setMenuOpen, setMenuText, spawnHud } from "./lib/hud.ts";
 import { loadSection, saveSection } from "./lib/save.ts";
 import { emptyStats, record, summary, type Outcome } from "./lib/stats.ts";
 
@@ -480,7 +480,7 @@ function checkScenarios() {
 
 const HELP = [
   "!start / !stop / !skip, !diff auto|easy|normal|hard|pro, !tier all|pro|high|mid|low|custom",
-  "!gun rifle|ak47|m4a1_silencer|m4a1|awp|deagle|keep, !focus on|off (more of the peeks you lose), !worst, !hud auto|custom|debug",
+  "!menu (clickable settings), !gun rifle|ak47|m4a1_silencer|m4a1|awp|deagle|keep, !focus on|off, !worst, !hud auto|custom|debug",
   "!shoot assist|fake|off, !stats, !reset (session), !packs, !check (line of sight of every scenario)",
   "own peeks: stand on your angle + !hold, walk to the peek start + !rec, swing out and stop; !custom clear",
 ];
@@ -535,6 +535,7 @@ function think() {
     tick();
     flushChat(now);
     drawOverlay(now);
+    updateMenu();
   } catch (error) {
     Console.Log(`[defrag] tick failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
   }
@@ -573,6 +574,8 @@ function onCommand(name: string, args: string[]) {
       settings.gun = arg;
       persist();
       return tell(`gun ${arg}`);
+    case "menu":
+      return toggleMenu();
     case "hud":
       if (!["auto", "custom", "debug"].includes(arg)) return tell(`hud: auto, custom or debug (custom layout ${hudAvailable() ? "found" : "missing"})`);
       settings.hud = arg as typeof settings.hud;
@@ -628,6 +631,56 @@ function onCommand(name: string, args: string[]) {
       return tell(`${customScenarios().length} custom peek(s) on ${mapName()}, !custom clear to remove them`);
   }
 }
+
+const DIFF_CYCLE = ["auto", "easy", "normal", "hard", "pro"];
+const TIER_CYCLE = ["all", ...TIERS];
+const SHOOT_CYCLE = ["assist", "fake", "off"];
+let menuOpen = false;
+
+function next(list: readonly string[], current: string) {
+  return list[(list.indexOf(current) + 1) % list.length]!;
+}
+
+function toggleMenu(open = !menuOpen) {
+  const slot = humanController()?.GetPlayerSlot();
+  if (slot === undefined) return;
+  if (!setMenuOpen(slot, open)) return tell("the custom HUD isn't loaded, use chat commands (!help)");
+  menuOpen = open;
+}
+
+function updateMenu() {
+  if (!menuOpen) return;
+  setMenuText({
+    menu_info: `${mapName()} | ${scenarios().length} scenarios | ${summary(state.stats)}`,
+    menu_diff: settings.difficulty === "auto" ? `auto (${(save.level ?? 1).toFixed(2)})` : settings.difficulty,
+    menu_tier: settings.tier,
+    menu_focus: settings.focus ? "on" : "off",
+    menu_shoot: settings.shoot,
+    menu_gun: settings.gun,
+  });
+}
+
+const MENU_ACTIONS: Record<string, () => void> = {
+  btn_start: () => {
+    toggleMenu(false);
+    onCommand("start", []);
+  },
+  btn_stop: () => onCommand("stop", []),
+  btn_skip: () => onCommand("skip", []),
+  btn_diff: () => onCommand("diff", [next(DIFF_CYCLE, settings.difficulty)]),
+  btn_tier: () => onCommand("tier", [next(TIER_CYCLE, settings.tier)]),
+  btn_focus: () => onCommand("focus", [settings.focus ? "off" : "on"]),
+  btn_shoot: () => onCommand("shoot", [next(SHOOT_CYCLE, settings.shoot)]),
+  btn_gun: () => onCommand("gun", [next(GUNS, settings.gun)]),
+  btn_reset: () => onCommand("reset", []),
+  btn_close: () => toggleMenu(false),
+};
+
+Instance.OnCustomHudClicked(({ layout, buttonId }) => {
+  if (!isHud(layout)) return;
+  MENU_ACTIONS[buttonId]?.();
+  updateMenu();
+});
 
 Instance.OnPlayerChat(({ player, text }) => {
   if (!player || player.IsBot()) return;
