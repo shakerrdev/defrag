@@ -7,6 +7,8 @@ export const CSHitGroup = { GENERIC: 0, HEAD: 1, CHEST: 2 };
 
 export class Entity {
   IsValid() { return true; }
+  Kill() {}
+  SetEntityName(_name: string) {}
 }
 
 export class CustomHudLayout extends Entity {
@@ -124,6 +126,7 @@ export const Instance = {
   TraceLine: () => ({ didHit: mock.wallBetween }),
   FindEntitiesByName: (name: string) => { const e = mock.entities.get(name); return e ? [e] : []; },
   DebugScreenText: () => {},
+  Precache: () => ({ IsServerLoaded: () => true }),
   SetThink: (f: () => void) => { mock.think = f; },
   SetNextThink: (t: number) => { mock.nextThink = t; },
   Delay: (s: number) => new Promise<void>((resolve) => timers.push({ at: mock.time + s, resolve })),

@@ -28,7 +28,7 @@ Scenarios come from `scenario-packs/*.json` bundled at build time (see the main 
 | `!check` | Traces from every holding spot to its peek at contact; scenarios without line of sight point to a map build that differs from the demo |
 | `!hold`, `!rec`, `!custom [clear]` | Record your own peek: `!hold` on your angle, walk to the start, `!rec`, swing out and stop. Saved per map (up to 40) |
 | `!menu` | Opens a clickable menu on the custom HUD (Start/Stop/Skip, difficulty, scenario tier, focus, shooting mode, your gun, reset); the mouse is captured while it's open |
-| `!hud auto\|custom\|debug` | Where the status shows: the custom Panorama HUD (`panorama/layout/custom_game/defrag.xml`, spawned by the script as a `custom_hud_layout`), or the debug-text overlay. `auto` uses the custom HUD once its entity exists |
+| `!hud auto\|custom\|debug` | Where the status shows: the custom Panorama HUD (`panorama/layout/custom_game/defrag.xml`, precached and spawned by the script as a `custom_hud_layout`), the debug-text overlay, or both (`auto`, the default, because the script can't tell whether the layout actually rendered) |
 | `!help` | Commands on screen |
 
 Before each rep the script traces from the holding spot to the peek at contact and skips scenarios that can't see each other (old demos on updated maps); `!check` re-runs that for all of them.

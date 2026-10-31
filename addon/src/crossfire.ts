@@ -43,6 +43,8 @@ const STOPPED_SPEED = 60;
 const BURST_RESET_SECONDS = 0.35;
 const FIGHT_SECONDS = 1.5;
 const GAP_SECONDS = 1;
+const SCRIPT_NAME = "defrag";
+const RUNNING_NAME = "defrag_running";
 const MISS_OFFSET_DEGREES = 4;
 const CUSTOM_LIMIT = 40;
 
@@ -201,7 +203,7 @@ function setupServer() {
   Console.SetConvar("mp_freezetime", 0);
   Console.SetConvar("mp_respawn_on_death_t", true);
   Console.SetConvar("mp_respawn_on_death_ct", true);
-  Console.SetConvar("mp_buy_anywhere", true);
+  Console.SetConvar("mp_buy_anywhere", 1);
   Console.SetConvar("mp_buytime", 9999);
   Console.SetConvar("sv_infinite_ammo", 1);
   Console.SetConvar("bot_difficulty", 3);
@@ -212,7 +214,7 @@ function setupServer() {
 function ensureOneBot() {
   if (controllers().filter((c) => c.IsBot()).length === 1) return;
   const team = humanController()?.GetTeamNumber() === 2 ? "ct" : "t";
-  Console.ServerCommand(`bot_kick; bot_quota 0; bot_add_${team}`);
+  Console.ServerCommand(`bot_kick; bot_quota 0; bot_difficulty 3; bot_add_${team} expert`);
 }
 
 function setPhase(phase: Phase, seconds = 0) {
@@ -570,12 +572,9 @@ function drawOverlay(now: number) {
   const result = state.lastResult && now - state.lastResult.at < 3 ? state.lastResult : undefined;
   const messages = [...(now < helpUntil ? HELP : []), ...recentMessages(now, 6)];
 
-  if (settings.hud !== "debug") {
-    const drawn = drawHud({ title, info, session, result: result?.text ?? "", good: result?.good ?? false, messages: messages.join("\n") });
-    if (drawn || settings.hud === "custom") return;
-  } else {
-    hideHud();
-  }
+  if (settings.hud === "debug") hideHud();
+  else drawHud({ title, info, session, result: result?.text ?? "", good: result?.good ?? false, messages: messages.join("\n") });
+  if (settings.hud === "custom") return;
   const lines: [string, typeof WHITE][] = [
     [title, YELLOW],
     [info, GREY],
@@ -650,10 +649,14 @@ function onCommand(name: string, args: string[]) {
     case "menu":
       return toggleMenu();
     case "hud":
-      if (!["auto", "custom", "debug"].includes(arg)) return tell(`hud: auto, custom or debug (custom layout ${hudAvailable() ? "found" : "missing"})`);
+      if (!["auto", "custom", "debug"].includes(arg)) return tell(`hud: auto (both), custom or debug (custom layout entity ${hudAvailable() ? "exists" : "missing"})`);
       settings.hud = arg as typeof settings.hud;
       persist();
-      return tell(`hud ${arg}${arg !== "debug" && !hudAvailable() ? ", but the custom layout isn't loaded" : ""}`);
+      return tell(
+        arg === "auto"
+          ? "hud auto: custom HUD and debug text both on (!hud custom once the custom one shows up)"
+          : `hud ${arg}${arg === "custom" && !hudAvailable() ? ", but the custom layout entity doesn't exist" : ""}`,
+      );
     case "worst": {
       const list = worst(save.records ?? {});
       if (!list.length) return tell("play a few reps first");
@@ -805,6 +808,12 @@ Instance.OnRoundStart(() => {
   if (state.running) setPhase("gap", GAP_SECONDS);
 });
 
+function becomeOnlyInstance() {
+  for (const old of Instance.FindEntitiesByName(RUNNING_NAME)) old.Kill();
+  for (const self of Instance.FindEntitiesByName(SCRIPT_NAME)) self.SetEntityName(RUNNING_NAME);
+}
+
+becomeOnlyInstance();
 restore();
 setupServer();
 spawnHud();

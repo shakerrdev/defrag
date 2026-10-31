@@ -1,7 +1,8 @@
-import { Console, CustomHudLayout, Instance } from "cs_script/point_script";
+import { Console, CustomHudLayout, Instance, type CSPrecache } from "cs_script/point_script";
 
 const NAME = "defrag_hud";
 const LAYOUT = "panorama/layout/custom_game/defrag.vxml";
+const STYLE = "panorama/styles/custom_game/defrag.vcss";
 const ROOT = "defrag";
 
 export type HudFields = { title: string; info: string; session: string; result: string; good: boolean; messages: string };
@@ -21,7 +22,20 @@ function find(): CustomHudLayout | undefined {
 export function spawnHud() {
   if (find() || spawnTried) return;
   spawnTried = true;
-  Console.ServerCommand(`ent_create custom_hud_layout { "targetname" "${NAME}" "layout" "${LAYOUT}" }`);
+  let precache: CSPrecache | undefined;
+  try {
+    precache = Instance.Precache({ resources: [LAYOUT, STYLE] });
+  } catch (error) {
+    Console.Log(`[defrag] precaching the HUD layout failed: ${error instanceof Error ? error.message : error}`);
+  }
+  const create = () => Console.ServerCommand(`ent_create custom_hud_layout { "targetname" "${NAME}" "layout" "${LAYOUT}" }`);
+  if (!precache) return create();
+  const waitUntil = Instance.GetGameTime() + 5;
+  const poll = () => {
+    if (precache!.IsServerLoaded() || Instance.GetGameTime() > waitUntil) return create();
+    Instance.Delay(0.1).then(poll);
+  };
+  poll();
 }
 
 export function hudAvailable() {
