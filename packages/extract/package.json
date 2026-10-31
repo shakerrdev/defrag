@@ -1,0 +1,19 @@
+{
+  "name": "@defrag/extract",
+  "private": true,
+  "type": "module",
+  "bin": { "defrag-extract": "./src/cli.ts" },
+  "scripts": {
+    "extract": "node src/cli.ts",
+    "check": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@defrag/scenario": "workspace:*",
+    "@laihoe/demoparser2": "^0.42.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "typescript": "^7.0.2"
+  }
+}

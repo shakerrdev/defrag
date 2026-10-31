@@ -9,10 +9,11 @@
   "scripts": {
     "build:addon": "pnpm --filter @defrag/addon build",
     "watch:addon": "pnpm --filter @defrag/addon watch",
+    "extract": "node packages/extract/src/cli.ts",
     "check": "pnpm -r check",
     "test": "pnpm -r test"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": ["esbuild", "@laihoe/demoparser2"]
   }
 }
