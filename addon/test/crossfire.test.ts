@@ -72,7 +72,7 @@ test("a rep puts you on the holding spot and the bot peeks along the recording",
   assert.equal(human.pawn.eyes.yaw, 90);
   assert.equal(bot.pawn.origin.x, -400);
   assert.equal(bot.pawn.weapon, "weapon_ak47");
-  mock.step(3);
+  for (let t = 0; t < 3 && bot.pawn.origin.x <= -400; t += 1 / 64) mock.step(1 / 64);
   assert.ok(bot.pawn.origin.x > -400, "bot moved");
   assert.ok(mock.commands.includes("bot_stop 0"), "assist mode unfreezes the bot");
 });
@@ -96,6 +96,21 @@ test("fake shooting can kill you, which ends the rep as a death", () => {
   mock.step(4);
   assert.ok(mock.log.some((l) => /\[defrag\] you (died|got headshot)/.test(l)), mock.log.slice(-10).join("\n"));
   assert.ok(human.pawn.alive, "god mode keeps you alive");
+});
+
+test("in assist mode a bot whose AI doesn't fire still shoots after a short grace", () => {
+  mock.chat("!stop");
+  mock.chat("!shoot assist");
+  mock.chat("!debug on");
+  human.pawn.alive = true;
+  human.pawn.health = 100;
+  bot.pawn.alive = true;
+  bot.pawn.health = 100;
+  mock.chat("!start");
+  mock.step(5);
+  assert.ok(mock.log.some((l) => l.includes("scripted shot")), mock.log.slice(-10).join("\n"));
+  assert.ok(mock.log.some((l) => /\[defrag\] you (died|got headshot)/.test(l)));
+  mock.chat("!debug off");
 });
 
 test("custom peeks can be recorded in game", () => {

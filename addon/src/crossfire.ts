@@ -41,6 +41,7 @@ const MAX_TURN_PER_TICK = 15;
 const ON_TARGET_DEGREES = 2;
 const STOPPED_SPEED = 60;
 const BURST_RESET_SECONDS = 0.35;
+const AI_GRACE_SECONDS = 0.25;
 const FIGHT_SECONDS = 1.5;
 const GAP_SECONDS = 1;
 const SCRIPT_NAME = "defrag";
@@ -53,6 +54,7 @@ const settings = {
   focus: false,
   gun: "rifle",
   hud: "auto" as "auto" | "custom" | "debug",
+  debug: false,
   weapons: "all" as WeaponClass | "all",
   tier: "all" as Tier | "all",
   shoot: "assist" as ShootMode,
@@ -76,6 +78,10 @@ type Rep = {
   burstLimit: number;
   burstResetUntil: number;
   nextShotAt: number;
+  moveSpeed: number;
+  triggerSince?: number;
+  lastShotAt: number;
+  debugTick: number;
   lastHitGroup?: CSHitGroup;
 };
 
@@ -238,6 +244,7 @@ function applyFrame(b: CSPlayerPawn, rep: Rep, index: number, still = false) {
   const s = sampleAt(rep.peek, index);
   const aiming = rep.aim !== undefined;
   const angles = aiming ? { pitch: 0, yaw: rep.aim!.yaw, roll: 0 } : { pitch: 0, yaw: s.yaw, roll: 0 };
+  rep.moveSpeed = still ? 0 : speed2d(s.velocity) * rep.speed;
   b.Move({ position: s.position, angles, velocity: still ? ZERO : s.velocity });
   if (!aiming) b.SetEyeAngles({ pitch: s.pitch, yaw: s.yaw, roll: 0 });
 }
@@ -345,6 +352,9 @@ function startRep() {
     burstLimit: 1,
     burstResetUntil: 0,
     nextShotAt: 0,
+    moveSpeed: 0,
+    lastShotAt: 0,
+    debugTick: 0,
   };
   state.rep = rep;
   rollBurstAim(rep);
@@ -417,34 +427,69 @@ function stop() {
   setPhase("idle");
 }
 
-function engage(b: CSPlayerPawn, h: CSPlayerPawn, rep: Rep, now: number) {
-  if (settings.shoot === "off" || rep.visibleAt === undefined) return;
-  if (now < rep.visibleAt + rep.reactMs / 1000 || !canSee(b, h)) {
-    if (settings.shoot === "assist") setTrigger(rep, false);
-    return;
-  }
-  const error = aimStep(b, h, rep);
-  if (settings.shoot === "assist") {
-    const stopped = speed2d(b.GetAbsVelocity()) < STOPPED_SPEED;
-    if (!rep.triggerOpen) rep.burstLimit = burstFor(distance(b.GetEyePosition(), h.GetEyePosition()));
-    const onTarget = error <= (rep.triggerOpen ? ON_TARGET_DEGREES * 2 : ON_TARGET_DEGREES);
-    return setTrigger(rep, onTarget && stopped && now >= rep.burstResetUntil);
-  }
-  if (error > ON_TARGET_DEGREES || now < rep.nextShotAt) return;
-  rep.nextShotAt = now + 0.1;
-  if (rep.aimOffset.yaw !== 0 || rep.aimOffset.pitch !== 0) return rollBurstAim(rep);
-  h.TakeDamage({ damage: rep.aimAtHead ? 111 : 27, attacker: b, inflictor: b, weapon: b.GetActiveWeapon() });
+function scriptedShot(h: CSPlayerPawn, b: CSPlayerPawn, rep: Rep) {
+  const hit = rep.aimOffset.yaw === 0 && rep.aimOffset.pitch === 0;
+  if (hit) h.TakeDamage({ damage: rep.aimAtHead ? 111 : 27, attacker: b, inflictor: b, weapon: b.GetActiveWeapon() });
   rollBurstAim(rep);
 }
 
+function debugEngage(rep: Rep, now: number, text: string) {
+  if (!settings.debug || rep.debugTick++ % 16 !== 0) return;
+  Console.Log(`[defrag] t=${now.toFixed(2)} ${text}`);
+}
+
+function engage(b: CSPlayerPawn, h: CSPlayerPawn, rep: Rep, now: number) {
+  if (settings.shoot === "off") return;
+  if (rep.visibleAt === undefined) return debugEngage(rep, now, "waiting: you can't see the bot yet");
+  const sees = canSee(b, h);
+  if (now < rep.visibleAt + rep.reactMs / 1000 || !sees) {
+    if (settings.shoot === "assist") closeTrigger(rep);
+    return debugEngage(rep, now, sees ? `reacting (${rep.reactMs} ms)` : "bot has no line of sight to you");
+  }
+  const error = aimStep(b, h, rep);
+  if (settings.shoot === "assist") {
+    const stopped = rep.moveSpeed < STOPPED_SPEED;
+    if (!rep.triggerOpen) rep.burstLimit = burstFor(distance(b.GetEyePosition(), h.GetEyePosition()));
+    const onTarget = error <= (rep.triggerOpen ? ON_TARGET_DEGREES * 2 : ON_TARGET_DEGREES);
+    const open = onTarget && stopped && now >= rep.burstResetUntil;
+    debugEngage(
+      rep,
+      now,
+      `aim error ${error.toFixed(1)} deg, speed ${Math.round(rep.moveSpeed)}, trigger ${open ? "open" : "closed"}, shots ${rep.burstShots}/${rep.burstLimit}`,
+    );
+    if (!open) return closeTrigger(rep);
+    setTrigger(rep, true);
+    rep.triggerSince ??= now;
+    if (now - Math.max(rep.triggerSince, rep.lastShotAt) < AI_GRACE_SECONDS || now < rep.nextShotAt) return;
+    rep.nextShotAt = now + 0.1;
+    if (settings.debug) Console.Log(`[defrag] t=${now.toFixed(2)} bot AI didn't fire, scripted shot`);
+    scriptedShot(h, b, rep);
+    return countShot(now, false);
+  }
+  if (error > ON_TARGET_DEGREES || now < rep.nextShotAt) return;
+  rep.nextShotAt = now + 0.1;
+  scriptedShot(h, b, rep);
+}
+
+function closeTrigger(rep: Rep) {
+  rep.triggerSince = undefined;
+  setTrigger(rep, false);
+}
+
 function onBotShot(now: number) {
+  countShot(now, true);
+}
+
+function countShot(now: number, real: boolean) {
   const rep = state.rep;
   if (!rep || settings.shoot !== "assist") return;
+  if (real) rep.lastShotAt = now;
+  if (settings.debug && real) Console.Log(`[defrag] t=${now.toFixed(2)} bot fired`);
   rep.burstShots++;
   if (rep.burstShots < rep.burstLimit) return;
   rep.burstShots = 0;
   rep.burstResetUntil = now + BURST_RESET_SECONDS;
-  setTrigger(rep, false);
+  closeTrigger(rep);
   rollBurstAim(rep);
 }
 
@@ -539,7 +584,7 @@ function checkScenarios() {
 const HELP = [
   "!start / !stop / !skip, !diff auto|easy|normal|hard|pro, !tier all|pro|high|mid|low|custom, !weapons all|rifles|pistols|smgs|snipers",
   "!set 20 (scored set, best saved), !menu (clickable settings), !gun rifle|ak47|m4a1_silencer|m4a1|awp|deagle|keep, !focus on|off, !worst, !hud auto|custom|debug",
-  "!shoot assist|fake|off, !stats, !reset (session), !packs, !check (line of sight of every scenario)",
+  "!shoot assist|fake|off, !stats, !reset (session), !packs, !check (line of sight of every scenario), !debug on|off",
   "own peeks: stand on your angle + !hold, walk to the peek start + !rec, swing out and stop; !custom clear",
 ];
 
@@ -648,6 +693,9 @@ function onCommand(name: string, args: string[]) {
       return tell(`bot weapons ${arg}: ${scenarios().length} scenarios`);
     case "menu":
       return toggleMenu();
+    case "debug":
+      settings.debug = arg !== "off";
+      return tell(`debug ${settings.debug ? "on: shooting state goes to the console" : "off"}`);
     case "hud":
       if (!["auto", "custom", "debug"].includes(arg)) return tell(`hud: auto (both), custom or debug (custom layout entity ${hudAvailable() ? "exists" : "missing"})`);
       settings.hud = arg as typeof settings.hud;
