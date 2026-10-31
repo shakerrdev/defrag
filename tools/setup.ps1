@@ -251,7 +251,7 @@ function Main {
     Info '1. Start Counter-Strike 2 Workshop Tools and pick the defrag addon.'
     Info '2. In the console: map de_mirage   (a map you have scenarios for; any map works for your own peeks)'
     Info '3. Join a team, then in the console: exec defrag'
-    Info '4. Chat says "[defrag] crossfire loaded: N scenarios". Type !start, or !help for everything else.'
+    Info '4. Chat says "[defrag] crossfire loaded: N scenarios". Type !menu for the clickable menu, !start, !set 20, or !help.'
     Info 'No scenarios? Stand on an angle and type !hold, walk to where the bot should come from, !rec, swing out and stop.'
     Info 'The older test script is still there: exec defrag_spike (load only one of the two per map).'
     Info "While editing the scripts, run $(Join-Path $repo 'watch.cmd') to rebuild and copy them on every save."
