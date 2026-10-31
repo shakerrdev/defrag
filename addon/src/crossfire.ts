@@ -467,6 +467,7 @@ function hasSight(s: Scenario) {
 }
 
 function checkScenarios() {
+  sight.clear();
   const pool = scenarios();
   const blocked = pool.filter((s) => !hasSight(s)).map((s) => s.id);
   Console.Log(`[defrag] check: ${blocked.length} of ${pool.length} without line of sight: ${blocked.join(" ")}`);
