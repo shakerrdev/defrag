@@ -197,6 +197,12 @@ function Build-MapSource($cs2, $repo, $addonContent, $name) {
     $ErrorActionPreference = 'Continue'
     & $cli -i $vpk -o $addonContent -d -e 'vmap_c' --game (Join-Path $cs2 'game\csgo\gameinfo.gi') 2>&1 | Out-File $log -Encoding utf8
     $ErrorActionPreference = 'Stop'
+    $nested = Join-Path $maps 'maps'
+    if (Test-Path $nested) {
+      Get-ChildItem $nested | ForEach-Object { Move-Item $_.FullName (Join-Path $maps $_.Name) -Force }
+      Remove-Item $nested -Recurse -Force
+      Info 'moved the split map parts from maps\maps up into maps'
+    }
     if (-not (Test-Path $source)) {
       $other = Get-ChildItem $maps -Filter "$name*.vmap" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike 'defrag_*' } | Select-Object -First 1
       if ($other) { $source = $other.FullName } else { Warn "decompiling $name produced no .vmap, see $log"; return }
