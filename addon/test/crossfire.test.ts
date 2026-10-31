@@ -56,6 +56,7 @@ before(async () => {
     ],
   });
   mock.controllers = [human, bot];
+  mock.save = JSON.stringify({ holder: { spike: true } });
   await import(pathToFileURL(outfile).href);
   mock.step(1.5);
 });
@@ -81,9 +82,10 @@ test("killing the bot records a kill with a reaction time and a best", () => {
   const result = mock.log.find((l) => l.startsWith("[defrag] headshot in"));
   assert.ok(result, mock.log.join("\n"));
   assert.match(result, /new best/);
-  const save = JSON.parse(mock.save);
+  const save = JSON.parse(mock.save).crossfire;
   assert.equal(typeof save.bests.de_mirage.reactMs, "number");
   assert.equal(save.bests.de_mirage.streak, 1);
+  assert.deepEqual(JSON.parse(mock.save).holder, { spike: true }, "the spike's save data is kept");
 });
 
 test("fake shooting can kill you, which ends the rep as a death", () => {
@@ -107,7 +109,7 @@ test("custom peeks can be recorded in game", () => {
   }
   human.pawn.velocity = { x: 0, y: 0, z: 0 };
   mock.step(0.5);
-  const save = JSON.parse(mock.save);
+  const save = JSON.parse(mock.save).crossfire;
   assert.equal(save.custom.de_mirage.length, 1);
   assert.equal(save.custom.de_mirage[0].tier, "custom");
 });

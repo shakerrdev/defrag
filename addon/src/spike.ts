@@ -10,6 +10,7 @@ import {
 } from "cs_script/point_script";
 import { flushChat, parseCommand, recentMessages, tell } from "./lib/chat.ts";
 import { add, distance, lookAt, randomBetween, round, speed2d, ZERO } from "./lib/math.ts";
+import { patchSave } from "./lib/save.ts";
 import { Recorder, sampleAt, sampleOf, type Holder, type Peek } from "./lib/peek.ts";
 
 type MoveMode = "move" | "teleport" | "velocity";
@@ -394,7 +395,7 @@ function status() {
 }
 
 function save() {
-  Instance.SetSaveData(JSON.stringify({ holder: state.holder, peek: state.peek, debug: debugLines }));
+  patchSave({ holder: state.holder, peek: state.peek, debug: debugLines });
 }
 
 function load() {

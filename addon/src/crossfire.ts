@@ -27,6 +27,7 @@ import { add, distance, lookAt, randomBetween, speed2d, ZERO } from "./lib/math.
 import { Recorder, sampleAt, sampleOf, type Peek } from "./lib/peek.ts";
 import { adapt, focusWeight, scaled, worst, type ScenarioRecord } from "./lib/adaptive.ts";
 import { drawHud, hideHud, hudAvailable, spawnHud } from "./lib/hud.ts";
+import { loadSection, saveSection } from "./lib/save.ts";
 import { emptyStats, record, summary, type Outcome } from "./lib/stats.ts";
 
 type ShootMode = "assist" | "fake" | "off";
@@ -103,17 +104,13 @@ function mapName() {
 
 function persist() {
   save.settings = { ...settings };
-  Instance.SetSaveData(JSON.stringify(save));
+  saveSection("crossfire", save);
 }
 
 function restore() {
-  try {
-    const data = JSON.parse(Instance.GetSaveData() || "{}") as Save;
-    if (data.version === FORMAT_VERSION) save = data;
-    Object.assign(settings, save.settings ?? {});
-  } catch {
-    Console.Log("[defrag] ignoring unreadable save data");
-  }
+  const data = loadSection<Save>("crossfire");
+  if (data?.version === FORMAT_VERSION) save = data;
+  Object.assign(settings, save.settings ?? {});
 }
 
 function customScenarios() {
