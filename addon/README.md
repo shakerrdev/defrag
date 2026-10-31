@@ -2,6 +2,29 @@
 
 Map scripts for the defrag Workshop addon. Every `src/*.ts` file is one script; `pnpm build:addon` bundles each into `dist/scripts/<name>.js` (and into `$CS2_ADDON_DIR/maps/scripts/` when that is set, the same layout as Valve's `cs_script_demo` addon). The Workshop Tools compile each into `<name>.vjs_c`, and a `point_script` entity points at it as `maps/scripts/<name>.vjs`.
 
+## Crossfire (the trainer)
+
+`src/crossfire.ts` is the actual trainer. Load it with `exec defrag` (the setup writes that config) on a map you have scenarios for, then `!start`.
+
+Each rep: you're put on the holding spot looking where the original player looked, the bot gets the original weapon and waits at the start of the recorded peek, then after a random 0.6–2 s it swings out along the real path. Once it can see you it waits the original player's reaction time (scaled by difficulty), turns onto you and shoots: in `assist` mode the bot's own AI pulls the trigger once the script's aim is on you and the bot has stopped (real shots), in short bursts by range; each burst aims at your head or chest by the original player's headshot share and is pulled off target by a few degrees by their miss rate. You can't die (the damage is stopped at 1 HP), but going down to 1 HP ends the rep as a death.
+
+Results: **kill** (with time since the bot became visible, headshot or not), **death**, or **miss** (bot alive 1.5 s after the peek ended). The overlay shows session kills, deaths, misses, streak, median and best reaction, plus your best reaction and streak on this map (kept in the addon's save data).
+
+Scenarios come from `scenario-packs/*.json` bundled at build time (see the main README) plus your own recorded peeks.
+
+| Command | What it does |
+| --- | --- |
+| `!start` / `!stop` / `!skip` | Run reps back to back / stop / next scenario |
+| `!diff easy\|normal\|hard\|pro` | Bot reaction time, accuracy and peek speed (normal = as in the demo) |
+| `!tier all\|pro\|high\|mid\|low\|custom` | Which scenarios to use |
+| `!shoot assist\|fake\|off` | `assist`: real shots from the AI trigger (default). `fake`: silent scripted damage. `off`: bot never shoots |
+| `!stats`, `!reset` | Session stats / reset them |
+| `!packs` | Bundled packs and how many are for this map |
+| `!hold`, `!rec`, `!custom [clear]` | Record your own peek: `!hold` on your angle, walk to the start, `!rec`, swing out and stop. Saved per map (up to 40) |
+| `!help` | Commands on screen |
+
+Untested in game so far: whether demo coordinates line up with the current map builds, whether demo spots are always standable, and how the assist bursts feel. `test/crossfire.test.ts` runs the script against a mocked script API to catch logic errors.
+
 ## Spike: can a script make a bot peek like a player?
 
 `src/spike.ts` lets you record your own peek and then replays it on a bot while you hold the angle, with switches for the open questions:

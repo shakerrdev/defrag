@@ -6,7 +6,13 @@ The goal is 80–90% of the real thing, not a full clone.
 
 ## Status
 
-Early. The first step is a spike that answers the one question the whole project depends on: can a map script move a bot along a recorded peek so it looks like a real player swinging out? It's ready to try in game: see [addon/README.md](addon/README.md).
+MVP, not tested in game yet. The spike proved scripted bot movement looks right; shooting back is still being tuned. What's there now:
+
+- `crossfire` map script: plays scenario packs for the current map in weighted random order, you on the holding spot, the bot on the recorded peek, shooting back after the original player's reaction time. Kill/death/miss, reaction time, streaks, personal bests saved per map, four difficulties. You can also record your own peeks in game.
+- `pnpm extract`: turns CS2 demos into scenario packs.
+- The older `spike` script for experiments.
+
+See [addon/README.md](addon/README.md) for playing it.
 
 ## How it will work
 
@@ -20,7 +26,10 @@ Early. The first step is a spike that answers the one question the whole project
 | Path | What |
 | --- | --- |
 | `addon/` | The Workshop addon's map scripts (TypeScript bundled to the JavaScript CS2 loads) |
-| `packages/` | Shared code to come: the scenario format and the demo extractor |
+| `packages/scenario` | The scenario pack format shared by the extractor and the map scripts |
+| `packages/extract` | Demo → scenario pack extractor (`pnpm extract`, uses demoparser2) |
+| `scenario-packs/` | Generated packs (`<map>.json`), bundled into the map script at build time; not committed |
+| `demos/` | Put demos here for the setup script to extract; not committed |
 
 Not in this repo, on purpose: decompiled official maps and other Valve assets, demos, and generated scenario packs. They stay local or go into releases.
 
@@ -32,7 +41,7 @@ Paste this into PowerShell:
 irm https://raw.githubusercontent.com/shakerrdev/defrag/main/tools/setup.ps1 | iex
 ```
 
-or double-click `setup.cmd` in a clone. It finds CS2 through Steam, checks for the Workshop Tools, downloads the code (when not run from a clone), gets a private copy of Node and pnpm if needed, creates the `defrag` addon, builds the map scripts into it, writes a `defrag_spike` console config and offers to start the Workshop Tools. Run it again any time to update. `watch.cmd` does the same and then rebuilds on every save. Options: `-Cs2Path <folder>` if CS2 isn't found, `-Launch` to start the tools without asking.
+or double-click `setup.cmd` in a clone. It finds CS2 through Steam, checks for the Workshop Tools, downloads the code (when not run from a clone), gets a private copy of Node and pnpm if needed, creates the `defrag` addon, extracts peeks from demos in `demos/` (tier from `-Tier`, default `pro`) and from your own match replays in `game/csgo/replays` (tier `mid`), builds the map scripts with those packs into the addon, writes the `defrag` and `defrag_spike` console configs and offers to start the Workshop Tools. Run it again any time to update. `watch.cmd` does the same and then rebuilds on every save. Options: `-Cs2Path <folder>` if CS2 isn't found, `-Launch` to start the tools without asking.
 
 ## Development setup
 
@@ -50,5 +59,14 @@ Built scripts land in `addon/dist/scripts`. Set `CS2_ADDON_DIR` to your addon's 
 ```sh
 CS2_ADDON_DIR="C:/Program Files (x86)/Steam/steamapps/common/Counter-Strike Global Offensive/content/csgo_addons/defrag" pnpm watch:addon
 ```
+
+Scenario packs:
+
+```sh
+pnpm extract --tier pro demos/*.dem     # writes scenario-packs/<map>.json, merging with what's there
+pnpm build:addon                        # bundles every pack in scenario-packs/ into crossfire.js
+```
+
+The extractor takes the first damage between two players in a round as the duel, keeps it when one of them was holding still and the other was moving, and drops flashed fights, fights through or near smokes, airborne peeks and fights with a third player shooting. The peeker's path (about 1 s before first contact until they stop), weapon, reaction time (time from contact to their first shot) and hit rate become the scenario; peeks from the same spots are merged into one weighted scenario.
 
 Types for the `cs_script/point_script` module come from the community `v8_scripting` package, which tracks Valve's `point_script.d.ts`.
