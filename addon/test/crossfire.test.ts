@@ -180,3 +180,11 @@ test("a set ends after its reps and saves the best result", () => {
   assert.ok(mock.log.some((l) => l.includes("set of 5 done: 5/5")), mock.log.slice(-8).join("\n"));
   assert.equal(JSON.parse(mock.save).crossfire.bests.de_mirage.sets["5"].kills, 5);
 });
+
+test("on a defrag_ map the scenarios of the original map are used", () => {
+  mock.chat("!stop");
+  mock.map = "defrag_de_mirage";
+  mock.chat("!packs");
+  assert.ok(mock.log.some((l) => l.includes("1 for de_mirage")), mock.log.slice(-3).join("\n"));
+  mock.map = "de_mirage";
+});

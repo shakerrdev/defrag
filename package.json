@@ -11,7 +11,7 @@
     "watch:addon": "pnpm --filter @defrag/addon watch",
     "extract": "node packages/extract/src/cli.ts",
     "check": "pnpm -r check",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test && node --test \"tools/test/*.test.ts\""
   },
   "pnpm": {
     "onlyBuiltDependencies": ["esbuild", "@laihoe/demoparser2"]

@@ -3,7 +3,9 @@ param(
   [switch]$Launch,
   [string]$Cs2Path,
   [ValidateSet("low", "mid", "high", "pro")]
-  [string]$Tier = "pro"
+  [string]$Tier = "pro",
+  [string[]]$Map = @(),
+  [switch]$RedoMap
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,6 +19,8 @@ $PnpmVersion = '10.28.0'
 $MinNode = [version]'22.18.0'
 $Home_ = Join-Path $env:LOCALAPPDATA 'defrag'
 $Tools = Join-Path $Home_ 'tools'
+$VrfVersion = '20.1'
+$VrfZip = "https://github.com/ValveResourceFormat/ValveResourceFormat/releases/download/$VrfVersion/cli-windows-x64.zip"
 
 function Step($text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
 function Ok($text) { Write-Host "    $text" -ForegroundColor Green }
@@ -164,6 +168,63 @@ function Extract-Scenarios($cs2, $repo, $addonContent) {
   }
 }
 
+function Get-Decompiler {
+  $dir = Join-Path $Tools "source2viewer-$VrfVersion"
+  $cli = Join-Path $dir 'Source2Viewer-CLI.exe'
+  if (Test-Path $cli) { return $cli }
+  New-Item -ItemType Directory -Force $dir | Out-Null
+  $zip = Join-Path $Tools 'source2viewer-cli.zip'
+  Info "downloading Source 2 Viewer CLI $VrfVersion (map decompiler, ~50 MB)"
+  Invoke-WebRequest $VrfZip -OutFile $zip -UseBasicParsing
+  [IO.Compression.ZipFile]::ExtractToDirectory($zip, $dir)
+  Remove-Item $zip -Force
+  $found = Get-ChildItem $dir -Recurse -Filter 'Source2Viewer-CLI.exe' | Select-Object -First 1
+  if (-not $found) { throw "Source2Viewer-CLI.exe not found in $VrfZip" }
+  if ($found.FullName -ne $cli) { Move-Item (Join-Path $found.DirectoryName '*') $dir -Force }
+  Ok "decompiler in $dir"
+  return $cli
+}
+
+function Build-MapSource($cs2, $repo, $addonContent, $name) {
+  $vpk = Join-Path $cs2 "game\csgo\maps\$name.vpk"
+  if (-not (Test-Path $vpk)) { Warn "no $vpk, skipping $name"; return }
+  $cli = Get-Decompiler
+  $maps = Join-Path $addonContent 'maps'
+  $source = Join-Path $maps "$name.vmap"
+  $log = Join-Path $Home_ "decompile-$name.log"
+  if ($RedoMap -or -not (Test-Path $source)) {
+    Info "decompiling $name (takes a few minutes, log: $log)"
+    $ErrorActionPreference = 'Continue'
+    & $cli -i $vpk -o $addonContent -d -e 'vmap_c' --game (Join-Path $cs2 'game\csgo\gameinfo.gi') 2>&1 | Out-File $log -Encoding utf8
+    $ErrorActionPreference = 'Stop'
+    if (-not (Test-Path $source)) {
+      $other = Get-ChildItem $maps -Filter "$name*.vmap" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike 'defrag_*' } | Select-Object -First 1
+      if ($other) { $source = $other.FullName } else { Warn "decompiling $name produced no .vmap, see $log"; return }
+    }
+    Ok "decompiled to $source"
+  } else {
+    Ok "$source already there (-RedoMap to decompile again)"
+  }
+
+  $navDir = Join-Path $Home_ "nav-$name"
+  $ErrorActionPreference = 'Continue'
+  & $cli -i $vpk -o $navDir -e 'nav' 2>&1 | Out-File $log -Append -Encoding utf8
+  $ErrorActionPreference = 'Stop'
+  $nav = Get-ChildItem $navDir -Recurse -Filter '*.nav' -ErrorAction SilentlyContinue | Select-Object -First 1
+  $gameMaps = Join-Path $cs2 "game\csgo_addons\$AddonName\maps"
+  New-Item -ItemType Directory -Force $gameMaps | Out-Null
+  if ($nav) {
+    Copy-Item $nav.FullName (Join-Path $gameMaps "defrag_$name.nav") -Force
+    Ok "bot nav mesh copied as defrag_$name.nav"
+  } else {
+    Warn "no nav mesh found in $vpk (bots may not move or shoot)"
+  }
+
+  $prefab = 'maps/' + (Split-Path $source -Leaf)
+  node (Join-Path $repo 'tools\make-map.ts') --prefab $prefab --out (Join-Path $maps "defrag_$name.vmap")
+  if ($LASTEXITCODE -ne 0) { throw "writing defrag_$name.vmap failed" }
+}
+
 function Compile-Scripts($cs2, $addonContent) {
   $compiler = Join-Path $cs2 'game\bin\win64\resourcecompiler.exe'
   if (-not (Test-Path $compiler)) {
@@ -245,9 +306,18 @@ function Main {
       Warn 'scripts not compiled because the Workshop Tools are missing: run this again once they are installed'
     }
     Write-ScriptConfig $cs2 'defrag' 'crossfire' 'the crossfire trainer'
+    if ($Map.Count) {
+      Step "Making the defrag map(s): $($Map -join ', ')"
+      foreach ($name in $Map) { Build-MapSource $cs2 $repo $addonContent $name }
+    }
     Write-ScriptConfig $cs2 'defrag_spike' 'spike' 'the bot peek spike'
 
     Step 'Done'
+    foreach ($name in $Map) {
+      Info "Map defrag_${name}: in the Workshop Tools open Hammer, File > Open > maps/defrag_$name.vmap,"
+      Info "  then Build (F9) with 'Build lighting' set to Fast (or off for a quick first try), then in the console: map defrag_$name"
+      Info "  The map already contains the crossfire script and the custom HUD, so no exec defrag there; !menu should open the clickable menu."
+    }
     Info '1. Start Counter-Strike 2 Workshop Tools and pick the defrag addon.'
     Info '2. In the console: map de_mirage   (a map you have scenarios for; any map works for your own peeks)'
     Info '3. Join a team, then in the console: exec defrag'

@@ -110,7 +110,10 @@ type Save = {
 let save: Save = { version: FORMAT_VERSION };
 
 function mapName() {
-  return Instance.GetMapName().replace(/^.*[\\/]/, "").replace(/\.vpk$/, "");
+  return Instance.GetMapName()
+    .replace(/^.*[\\/]/, "")
+    .replace(/\.vpk$/, "")
+    .replace(/^defrag_/, "");
 }
 
 function persist() {
