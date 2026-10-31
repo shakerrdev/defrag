@@ -5,6 +5,17 @@ export const CSDamageFlags = { PREVENT_DEATH: 1 << 10 };
 export const CSDamageTypes = { BULLET: 2 };
 export const CSHitGroup = { GENERIC: 0, HEAD: 1, CHEST: 2 };
 
+export class Entity {
+  IsValid() { return true; }
+}
+
+export class CustomHudLayout extends Entity {
+  vars = new Map<string, string>();
+  classes = new Map<string, boolean>();
+  SetDialogVariableString(panel: string, name: string, value: string) { this.vars.set(`${panel}.${name}`, value); }
+  SetHasClass(panel: string, name: string, on?: boolean) { this.classes.set(`${panel}.${name}`, on ?? false); }
+}
+
 export class Pawn {
   origin: Vector = { x: 0, y: 0, z: 0 };
   velocity: Vector = { x: 0, y: 0, z: 0 };
@@ -70,6 +81,7 @@ export const mock = {
   think: undefined as (() => void) | undefined,
   nextThink: 0,
   wallBetween: false,
+  entities: new Map<string, Entity>(),
   emit(name: string, event: unknown) {
     return (this.handlers[name] ?? []).map((h) => h(event));
   },
@@ -106,6 +118,7 @@ export const Instance = {
   SetSaveData: (s: string) => { mock.save = s; },
   GetAllPlayerControllers: () => mock.controllers,
   TraceLine: () => ({ didHit: mock.wallBetween }),
+  FindEntitiesByName: (name: string) => { const e = mock.entities.get(name); return e ? [e] : []; },
   DebugScreenText: () => {},
   SetThink: (f: () => void) => { mock.think = f; },
   SetNextThink: (t: number) => { mock.nextThink = t; },

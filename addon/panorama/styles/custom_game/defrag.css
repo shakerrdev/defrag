@@ -1,0 +1,63 @@
+.DefragRoot {
+  width: 100%;
+  height: 100%;
+}
+
+.Card {
+  horizontal-align: left;
+  vertical-align: top;
+  margin-left: 24px;
+  margin-top: 220px;
+  width: 520px;
+  flow-children: down;
+  padding: 10px 14px;
+  background-color: #0d1110cc;
+  border-radius: 6px;
+  border-left: 3px solid #e3b34b;
+}
+
+.HUD_SCOREBOARD_VISIBLE .Card,
+.HUD_BUYMENU_VISIBLE .Card,
+.HUD_TEAMMENU_VISIBLE .Card {
+  opacity: 0;
+}
+
+Label {
+  font-family: Stratum2, "Arial Unicode MS";
+  color: #e2e9e5;
+  font-size: 16px;
+  width: 100%;
+}
+
+.Title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #e3b34b;
+}
+
+.Info,
+.Messages {
+  font-size: 14px;
+  color: #93a29b;
+}
+
+.Session {
+  margin-top: 4px;
+}
+
+.Result {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: bold;
+  color: #ec8a7e;
+  transition-property: opacity;
+  transition-duration: 0.2s;
+}
+
+.Result.Good {
+  color: #5fcf93;
+}
+
+.Hidden {
+  opacity: 0;
+}

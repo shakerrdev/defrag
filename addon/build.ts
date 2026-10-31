@@ -1,5 +1,5 @@
 import { context, build, type BuildOptions } from "esbuild";
-import { readdirSync, mkdirSync, copyFileSync, existsSync, readFileSync } from "node:fs";
+import { readdirSync, mkdirSync, copyFileSync, existsSync, readFileSync, cpSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const root = import.meta.dirname;
@@ -21,6 +21,8 @@ function copyToAddon(files: string[]) {
     copyFileSync(file, join(target, file.slice(outdir.length + 1)));
   }
   console.log(`copied ${files.length} script(s) to ${target}`);
+  cpSync(join(root, "panorama"), join(addonDir, "panorama"), { recursive: true });
+  console.log(`copied the HUD layout to ${join(addonDir, "panorama")}`);
 }
 
 const options: BuildOptions = {

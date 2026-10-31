@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import type { Frame, Pack } from "@defrag/scenario";
-import { Controller, mock } from "./mock/point_script.ts";
+import { Controller, CustomHudLayout, mock } from "./mock/point_script.ts";
 
 const mockPath = join(import.meta.dirname, "mock", "point_script.ts");
 
@@ -110,4 +110,14 @@ test("custom peeks can be recorded in game", () => {
   const save = JSON.parse(mock.save);
   assert.equal(save.custom.de_mirage.length, 1);
   assert.equal(save.custom.de_mirage[0].tier, "custom");
+});
+
+test("the custom HUD gets the overlay text when its layout entity exists", () => {
+  assert.ok(mock.commands.some((c) => c.startsWith("ent_create custom_hud_layout")));
+  const hud = new CustomHudLayout();
+  mock.entities.set("defrag_hud", hud);
+  mock.step(0.1);
+  assert.match(hud.vars.get("defrag.title") ?? "", /^defrag crossfire \| de_mirage/);
+  assert.match(hud.vars.get("defrag.session") ?? "", /kills/);
+  assert.equal(hud.classes.get("result.Hidden"), true);
 });

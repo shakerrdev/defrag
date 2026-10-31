@@ -25,6 +25,7 @@ Scenarios come from `scenario-packs/*.json` bundled at build time (see the main 
 | `!packs` | Bundled packs and how many are for this map |
 | `!check` | Traces from every holding spot to its peek at contact; scenarios without line of sight point to a map build that differs from the demo |
 | `!hold`, `!rec`, `!custom [clear]` | Record your own peek: `!hold` on your angle, walk to the start, `!rec`, swing out and stop. Saved per map (up to 40) |
+| `!hud auto\|custom\|debug` | Where the status shows: the custom Panorama HUD (`panorama/layout/custom_game/defrag.xml`, spawned by the script as a `custom_hud_layout`), or the debug-text overlay. `auto` uses the custom HUD once its entity exists |
 | `!help` | Commands on screen |
 
 Untested in game so far: whether demo coordinates line up with the current map builds, whether demo spots are always standable, and how the assist bursts feel. `test/crossfire.test.ts` runs the script against a mocked script API to catch logic errors.

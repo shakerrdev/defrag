@@ -174,8 +174,13 @@ function Compile-Scripts($cs2, $addonContent) {
   New-Item -ItemType Directory -Force $Home_ | Out-Null
   Set-Content $log '' -Encoding utf8
   $failed = 0
-  foreach ($script in Get-ChildItem (Join-Path $addonContent 'maps\scripts') -Filter *.js) {
-    $compiled = Join-Path $cs2 "game\csgo_addons\$AddonName\maps\scripts\$($script.BaseName).vjs_c"
+  $sources = @(Get-ChildItem (Join-Path $addonContent 'maps\scripts') -Filter *.js)
+  $panorama = Join-Path $addonContent 'panorama'
+  if (Test-Path $panorama) { $sources += @(Get-ChildItem $panorama -Recurse -Include *.xml, *.css) }
+  foreach ($script in $sources) {
+    $relative = $script.FullName.Substring($addonContent.Length).TrimStart('\')
+    $extension = @{ '.js' = '.vjs_c'; '.xml' = '.vxml_c'; '.css' = '.vcss_c' }[$script.Extension]
+    $compiled = Join-Path $cs2 "game\csgo_addons\$AddonName\$([IO.Path]::ChangeExtension($relative, $extension))"
     if (Test-Path $compiled) { Remove-Item $compiled -Force }
     "== $($script.FullName)" | Out-File $log -Append -Encoding utf8
     $ErrorActionPreference = 'Continue'

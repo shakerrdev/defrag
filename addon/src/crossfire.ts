@@ -25,6 +25,7 @@ import { flushChat, parseCommand, recentMessages, tell } from "./lib/chat.ts";
 import { add, distance, lookAt, randomBetween, speed2d, ZERO } from "./lib/math.ts";
 import { Recorder, sampleAt, sampleOf, type Peek } from "./lib/peek.ts";
 import { adapt, focusWeight, scaled, worst, type ScenarioRecord } from "./lib/adaptive.ts";
+import { drawHud, hideHud, hudAvailable, spawnHud } from "./lib/hud.ts";
 import { emptyStats, record, summary, type Outcome } from "./lib/stats.ts";
 
 type ShootMode = "assist" | "fake" | "off";
@@ -46,6 +47,7 @@ const settings = {
   difficulty: "auto" as Difficulty | "auto",
   focus: false,
   gun: "rifle",
+  hud: "auto" as "auto" | "custom" | "debug",
   tier: "all" as Tier | "all",
   shoot: "assist" as ShootMode,
   delayMin: 0.6,
@@ -445,7 +447,7 @@ function checkScenarios() {
 
 const HELP = [
   "!start / !stop / !skip, !diff auto|easy|normal|hard|pro, !tier all|pro|high|mid|low|custom",
-  "!gun rifle|ak47|m4a1_silencer|m4a1|awp|deagle|keep, !focus on|off (more of the peeks you lose), !worst",
+  "!gun rifle|ak47|m4a1_silencer|m4a1|awp|deagle|keep, !focus on|off (more of the peeks you lose), !worst, !hud auto|custom|debug",
   "!shoot assist|fake|off, !stats, !reset (session), !packs, !check (line of sight of every scenario)",
   "own peeks: stand on your angle + !hold, walk to the peek start + !rec, swing out and stop; !custom clear",
 ];
@@ -469,18 +471,28 @@ function hint() {
 
 function drawOverlay(now: number) {
   const b = bests();
+  const title = `defrag crossfire | ${mapName()} | ${hint()}`;
+  const difficulty = settings.difficulty === "auto" ? `auto ${(save.level ?? 1).toFixed(2)}` : settings.difficulty;
+  const info =
+    `${scenarios().length} scenarios (${settings.tier}) | ${difficulty}${settings.focus ? " focus" : ""} | shoot ${settings.shoot} | ` +
+    `best ${b.reactMs !== undefined ? `${b.reactMs} ms` : "-"} | best streak ${b.streak ?? 0}`;
+  const session = summary(state.stats);
+  const result = state.lastResult && now - state.lastResult.at < 3 ? state.lastResult : undefined;
+  const messages = [...(now < helpUntil ? HELP : []), ...recentMessages(now, 6)];
+
+  if (settings.hud !== "debug") {
+    const drawn = drawHud({ title, info, session, result: result?.text ?? "", good: result?.good ?? false, messages: messages.join("\n") });
+    if (drawn || settings.hud === "custom") return;
+  } else {
+    hideHud();
+  }
   const lines: [string, typeof WHITE][] = [
-    [`defrag crossfire | ${mapName()} | ${hint()}`, YELLOW],
-    [
-      `${scenarios().length} scenarios (${settings.tier}) | ${settings.difficulty === "auto" ? `auto ${(save.level ?? 1).toFixed(2)}` : settings.difficulty}${settings.focus ? " focus" : ""} | shoot ${settings.shoot} | ` +
-        `best ${b.reactMs !== undefined ? `${b.reactMs} ms` : "-"} | best streak ${b.streak ?? 0}`,
-      GREY,
-    ],
-    [summary(state.stats), WHITE],
+    [title, YELLOW],
+    [info, GREY],
+    [session, WHITE],
   ];
-  if (state.lastResult && now - state.lastResult.at < 3) lines.push([state.lastResult.text, state.lastResult.good ? GREEN : RED]);
-  if (now < helpUntil) for (const line of HELP) lines.push([line, WHITE]);
-  for (const message of recentMessages(now, 6)) lines.push([message, GREY]);
+  if (result) lines.push([result.text, result.good ? GREEN : RED]);
+  for (const message of messages) lines.push([message, GREY]);
   lines.forEach(([text, color], i) => Instance.DebugScreenText({ text, x: X, y: Y + i * LINE, color }));
 }
 
@@ -528,6 +540,11 @@ function onCommand(name: string, args: string[]) {
       settings.gun = arg;
       persist();
       return tell(`gun ${arg}`);
+    case "hud":
+      if (!["auto", "custom", "debug"].includes(arg)) return tell(`hud: auto, custom or debug (custom layout ${hudAvailable() ? "found" : "missing"})`);
+      settings.hud = arg as typeof settings.hud;
+      persist();
+      return tell(`hud ${arg}${arg !== "debug" && !hudAvailable() ? ", but the custom layout isn't loaded" : ""}`);
     case "worst": {
       const list = worst(save.records ?? {});
       if (!list.length) return tell("play a few reps first");
@@ -625,6 +642,7 @@ Instance.OnRoundStart(() => {
 
 restore();
 setupServer();
+spawnHud();
 Instance.SetThink(think);
 Instance.SetNextThink(Instance.GetGameTime() + TICK);
 Instance.Delay(1).then(() => {

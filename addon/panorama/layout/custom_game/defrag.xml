@@ -1,0 +1,14 @@
+<root>
+  <styles>
+    <include src="file://{resources}/styles/custom_game/defrag.css" />
+  </styles>
+  <Panel id="defrag" class="DefragRoot" hittest="false">
+    <Panel id="card" class="Card" hittest="false">
+      <Label id="title" class="Title" text="{s:title}" hittest="false" />
+      <Label id="info" class="Info" text="{s:info}" hittest="false" />
+      <Label id="session" class="Session" text="{s:session}" hittest="false" />
+      <Label id="result" class="Result Hidden" text="{s:result}" hittest="false" />
+      <Label id="messages" class="Messages" text="{s:messages}" hittest="false" />
+    </Panel>
+  </Panel>
+</root>
