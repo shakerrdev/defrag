@@ -9,6 +9,10 @@ importers:
   .: {}
 
   addon:
+    dependencies:
+      '@defrag/scenario':
+        specifier: workspace:*
+        version: link:../packages/scenario
     devDependencies:
       esbuild:
         specifier: ^0.28.2

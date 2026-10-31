@@ -1,5 +1,5 @@
 import { context, build, type BuildOptions } from "esbuild";
-import { readdirSync, mkdirSync, copyFileSync } from "node:fs";
+import { readdirSync, mkdirSync, copyFileSync, existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const root = import.meta.dirname;
@@ -7,8 +7,10 @@ const outdir = join(root, "dist", "scripts");
 const addonDir = process.env.CS2_ADDON_DIR ? resolve(process.env.CS2_ADDON_DIR) : undefined;
 const watch = process.argv.includes("--watch");
 
+const packsDir = resolve(process.env.DEFRAG_PACKS_DIR ?? join(root, "..", "scenario-packs"));
+
 const entryPoints = readdirSync(join(root, "src"))
-  .filter((name) => name.endsWith(".ts"))
+  .filter((name) => name.endsWith(".ts") && !name.endsWith(".d.ts"))
   .map((name) => join(root, "src", name));
 
 function copyToAddon(files: string[]) {
@@ -32,6 +34,23 @@ const options: BuildOptions = {
   metafile: true,
   logLevel: "info",
   plugins: [
+    {
+      name: "scenario-packs",
+      setup(b) {
+        b.onResolve({ filter: /^defrag:packs$/ }, () => ({ path: packsDir, namespace: "scenario-packs" }));
+        b.onLoad({ filter: /.*/, namespace: "scenario-packs" }, () => {
+          const files = existsSync(packsDir) ? readdirSync(packsDir).filter((f) => f.endsWith(".json")) : [];
+          const packs = files.map((f) => JSON.parse(readFileSync(join(packsDir, f), "utf8")));
+          console.log(`bundling ${packs.length} scenario pack(s) from ${packsDir}`);
+          return {
+            contents: `export default ${JSON.stringify(packs)};`,
+            loader: "js",
+            watchDirs: existsSync(packsDir) ? [packsDir] : [],
+            watchFiles: files.map((f) => join(packsDir, f)),
+          };
+        });
+      },
+    },
     {
       name: "copy-to-addon",
       setup(b) {
