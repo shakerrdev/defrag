@@ -8,9 +8,9 @@ import {
   type CSPlayerPawn,
   type QAngle,
 } from "cs_script/point_script";
-import { flushChat, parseCommand, recentMessages, tell } from "./spike/chat.ts";
-import { add, distance, lookAt, randomBetween, round, speed2d, ZERO } from "./spike/math.ts";
-import { Recorder, sampleAt, sampleOf, type Holder, type Peek } from "./spike/peek.ts";
+import { flushChat, parseCommand, recentMessages, tell } from "./lib/chat.ts";
+import { add, distance, lookAt, randomBetween, round, speed2d, ZERO } from "./lib/math.ts";
+import { Recorder, sampleAt, sampleOf, type Holder, type Peek } from "./lib/peek.ts";
 
 type MoveMode = "move" | "teleport" | "velocity";
 type ShootMode = "off" | "hybrid" | "fake" | "assist";

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Recorder, sampleAt, type Sample } from "../src/spike/peek.ts";
-import { lerpYaw, lookAt } from "../src/spike/math.ts";
+import { Recorder, sampleAt, type Sample } from "../src/lib/peek.ts";
+import { lerpYaw, lookAt } from "../src/lib/math.ts";
 
 function sample(x: number, vx: number, yaw = 0): Sample {
   return { position: { x, y: 0, z: 0 }, velocity: { x: vx, y: 0, z: 0 }, yaw, pitch: 0, ducked: false };
