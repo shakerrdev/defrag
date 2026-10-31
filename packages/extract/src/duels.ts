@@ -48,7 +48,8 @@ export type Rejection =
   | "smoke"
   | "airborne"
   | "third-party"
-  | "short-path";
+  | "short-path"
+  | "not-holding";
 
 export type Options = { tier: Tier; leadTicks: number; tailTicks: number };
 
@@ -63,6 +64,7 @@ const PRE_ROLL = 8;
 const STOP_SPEED = 60;
 const SMOKE_RADIUS = 160;
 const THIRD_PARTY_RANGE = 1200;
+const HOLD_CONE = 45;
 const BASE_REACT_MS = 180;
 const NO_SHOT_REACT_MS = 450;
 
@@ -187,6 +189,10 @@ function analyse(demo: DemoData, hurt: Hurt, options: Options): Duel | Rejection
   );
   if (otherHurt) return "third-party";
 
+  const holderView = holder.get(contact - 32) ?? h;
+  const angleToPeeker = (Math.atan2(p.y - h.y, p.x - h.x) * 180) / Math.PI;
+  if (Math.abs(((((angleToPeeker - holderView.yaw) % 360) + 540) % 360) - 180) > HOLD_CONE) return "not-holding";
+
   let start = contact - options.leadTicks;
   while (start < contact - PRE_ROLL && (speedAt(peeker, start + PRE_ROLL) ?? 0) < STOP_SPEED) start++;
   start = Math.max(contact - options.leadTicks, start);
@@ -226,7 +232,6 @@ function analyse(demo: DemoData, hurt: Hurt, options: Options): Duel | Rejection
     (x) => x.attacker === holderId && x.victim === peekerId && x.health <= 0 && x.tick <= end + 64,
   );
 
-  const holderView = holder.get(contact - 32) ?? h;
   return {
     holder: holderId,
     peeker: peekerId,

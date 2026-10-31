@@ -54,6 +54,12 @@ test("rejects moving holders, smokes and flashes", () => {
   assert.deepEqual(findDuels(flashed).rejected, { flashed: 1 });
 });
 
+test("rejects holders who weren't looking towards the peek", () => {
+  const turned = demo();
+  for (const state of turned.tracks.get("holder")!.values()) state.yaw = -90;
+  assert.deepEqual(findDuels(turned).rejected, { "not-holding": 1 });
+});
+
 test("only the first damage between a pair per round counts, utility skipped", () => {
   const hurts = [
     { tick: 5, round: 1, attacker: "a", victim: "b", weapon: "ak47", hitgroup: "", health: 50 },

@@ -67,6 +67,6 @@ pnpm extract --tier pro demos/*.dem     # writes scenario-packs/<map>.json, merg
 pnpm build:addon                        # bundles every pack in scenario-packs/ into crossfire.js
 ```
 
-The extractor takes the first damage between two players in a round as the duel, keeps it when one of them was holding still and the other was moving, and drops flashed fights, fights through or near smokes, airborne peeks and fights with a third player shooting. The peeker's path (about 1 s before first contact until they stop), weapon, reaction time (time from contact to their first shot) and hit rate become the scenario; peeks from the same spots are merged into one weighted scenario.
+The extractor takes the first damage between two players in a round as the duel, keeps it when one of them was holding still and the other was moving, and drops fights where the holder was looking more than 45° away from the peek, flashed fights, fights through or near smokes, airborne peeks and fights with a third player shooting. The peeker's path (about 1 s before first contact until they stop), weapon, reaction time (time from contact to their first shot) and hit rate become the scenario; peeks from the same spots are merged into one weighted scenario.
 
 Types for the `cs_script/point_script` module come from the community `v8_scripting` package, which tracks Valve's `point_script.d.ts`.
