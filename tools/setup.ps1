@@ -256,6 +256,9 @@ function Build-MapSource($cs2, $repo, $addonContent, $name) {
     Ok "$source already there (-RedoMap to decompile again)"
   }
 
+  node (Join-Path $repo 'tools\fix-decompile.ts') --content $addonContent --map ([IO.Path]::GetFileNameWithoutExtension($source))
+  if ($LASTEXITCODE -ne 0) { Warn 'sorting the decompiled files into place failed' }
+
   $navDir = Join-Path $Home_ "nav-$name"
   $ErrorActionPreference = 'Continue'
   & $cli -i $vpk -o $navDir -e 'nav' 2>&1 | Out-File $log -Append -Encoding utf8
