@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   FORMAT_VERSION,
+  decodeFrames,
+  encodeFrames,
   frameOf,
   normalizeYaw,
   packProblems,
@@ -72,4 +74,16 @@ test("tuned scales by difficulty", () => {
   assert.deepEqual(tuned(scenario(), "normal"), { reactMs: 250, accuracy: 0.4, speed: 1 });
   assert.ok(tuned(scenario(), "easy").reactMs > 250);
   assert.ok(tuned(scenario({ accuracy: 0.9 }), "pro").accuracy <= 0.95);
+});
+
+test("frames survive the compact encoding within its precision", () => {
+  const frames: Frame[] = [
+    [-1234.5, 2048.1, -160, 179.9, -12.3, 0],
+    [-1230, 2050.4, -159.5, -179.8, -12.1, 1],
+    [-1100.2, 2100, -150, 90, 3.45, 0],
+  ];
+  const back = decodeFrames(encodeFrames(frames));
+  assert.equal(back.length, 3);
+  back.forEach((f, i) => f.forEach((v, j) => assert.ok(Math.abs(v - frames[i]![j]!) <= 0.26, `${i}.${j}: ${v} vs ${frames[i]![j]}`)));
+  assert.ok(encodeFrames(frames).length < JSON.stringify(frames).length / 2);
 });

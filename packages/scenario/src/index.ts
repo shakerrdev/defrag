@@ -142,3 +142,66 @@ export function tuned(s: Scenario, difficulty: Difficulty) {
     speed: d.speed,
   };
 }
+
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+const SCALES = [2, 2, 2, 10, 10, 1];
+
+function pushVarint(out: string[], value: number) {
+  let v = value < 0 ? -value * 2 - 1 : value * 2;
+  do {
+    let chunk = v & 31;
+    v = Math.floor(v / 32);
+    if (v > 0) chunk |= 32;
+    out.push(ALPHABET[chunk]!);
+  } while (v > 0);
+}
+
+export function encodeFrames(frames: Frame[]): string {
+  const out: string[] = [];
+  const prev = [0, 0, 0, 0, 0, 0];
+  for (const frame of frames) {
+    for (let i = 0; i < 6; i++) {
+      const q = Math.round(frame[i]! * SCALES[i]!);
+      let delta = q - prev[i]!;
+      if (i === 3) delta = ((((delta + 1800) % 3600) + 3600) % 3600) - 1800;
+      pushVarint(out, delta);
+      prev[i] = prev[i]! + delta;
+    }
+  }
+  return out.join("");
+}
+
+export function decodeFrames(text: string): Frame[] {
+  const frames: Frame[] = [];
+  const values: number[] = [0, 0, 0, 0, 0, 0];
+  let pos = 0;
+  while (pos < text.length) {
+    const frame = [] as unknown as Frame;
+    for (let i = 0; i < 6; i++) {
+      let v = 0;
+      let mult = 1;
+      let chunk: number;
+      do {
+        chunk = ALPHABET.indexOf(text[pos++]!);
+        v += (chunk & 31) * mult;
+        mult *= 32;
+      } while (chunk & 32);
+      values[i] = values[i]! + (v % 2 ? -(v + 1) / 2 : v / 2);
+      (frame as number[])[i] = i === 3 ? normalizeYaw(values[i]! / SCALES[i]!) : values[i]! / SCALES[i]!;
+    }
+    frames.push(frame);
+  }
+  return frames;
+}
+
+export type CompactScenario = Omit<Scenario, "frames"> & { frames?: Frame[]; path: string };
+
+export function compact(s: Scenario): CompactScenario {
+  const { frames, source, ...rest } = s;
+  return { ...rest, path: encodeFrames(frames) };
+}
+
+export function expand(s: Scenario | CompactScenario): Scenario {
+  if ("path" in s && !s.frames) return { ...s, frames: decodeFrames(s.path) } as Scenario;
+  return s as Scenario;
+}

@@ -1,4 +1,5 @@
 import { context, build, type BuildOptions } from "esbuild";
+import { compact, type Pack } from "@defrag/scenario";
 import { readdirSync, mkdirSync, copyFileSync, existsSync, readFileSync, cpSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -42,8 +43,11 @@ const options: BuildOptions = {
         b.onResolve({ filter: /^defrag:packs$/ }, () => ({ path: packsDir, namespace: "scenario-packs" }));
         b.onLoad({ filter: /.*/, namespace: "scenario-packs" }, () => {
           const files = existsSync(packsDir) ? readdirSync(packsDir).filter((f) => f.endsWith(".json")) : [];
-          const packs = files.map((f) => JSON.parse(readFileSync(join(packsDir, f), "utf8")));
-          console.log(`bundling ${packs.length} scenario pack(s) from ${packsDir}`);
+          const packs = files.map((f) => {
+            const pack = JSON.parse(readFileSync(join(packsDir, f), "utf8")) as Pack;
+            return { ...pack, scenarios: pack.scenarios.map(compact) };
+          });
+          console.log(`bundling ${packs.length} scenario pack(s), ${packs.reduce((n, p) => n + p.scenarios.length, 0)} scenarios, from ${packsDir}`);
           return {
             contents: `export default ${JSON.stringify(packs)};`,
             loader: "js",

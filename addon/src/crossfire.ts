@@ -11,6 +11,7 @@ import {
 import packs from "defrag:packs";
 import {
   DIFFICULTIES,
+  expand,
   FORMAT_VERSION,
   frameOf,
   pickWeighted,
@@ -119,11 +120,26 @@ function customScenarios() {
   return (save.custom ??= {})[mapName()] ?? [];
 }
 
+const expanded = new Map<string, Scenario[]>();
+let pool: { key: string; list: Scenario[] } | undefined;
+
+function packScenarios(map: string) {
+  let list = expanded.get(map);
+  if (!list) {
+    list = packs.filter((p) => p.map === map).flatMap((p) => p.scenarios.map(expand));
+    expanded.set(map, list);
+  }
+  return list;
+}
+
 function scenarios(): Scenario[] {
   const map = mapName();
-  const fromPacks = packs.filter((p) => p.map === map).flatMap((p) => p.scenarios);
-  const all = [...fromPacks, ...customScenarios()];
-  return settings.tier === "all" ? all : all.filter((s) => s.tier === settings.tier);
+  const custom = customScenarios();
+  const key = `${map}|${settings.tier}|${custom.length}`;
+  if (pool?.key === key) return pool.list;
+  const all = [...packScenarios(map), ...custom];
+  pool = { key, list: settings.tier === "all" ? all : all.filter((s) => s.tier === settings.tier) };
+  return pool.list;
 }
 
 function bests() {
