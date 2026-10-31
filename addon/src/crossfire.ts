@@ -398,9 +398,29 @@ function saveCustom(samples: ReturnType<Recorder["finish"]>) {
   tell(`saved custom peek #${list.length} (${samples.length} ticks), walk back to your angle and !hold for the next one or !start`);
 }
 
+const EYE = 64;
+
+function checkScenarios() {
+  const pool = scenarios();
+  const blocked: string[] = [];
+  for (const s of pool) {
+    const [x, y, z] = s.holder.position;
+    const f = s.frames[Math.min(s.contactFrame + 8, s.frames.length - 1)]!;
+    const start = { x, y, z: z + EYE };
+    const end = { x: f[0], y: f[1], z: f[2] + EYE };
+    if (Instance.TraceLine({ start, end }).didHit) blocked.push(s.id);
+  }
+  Console.Log(`[defrag] check: ${blocked.length} of ${pool.length} without line of sight: ${blocked.join(" ")}`);
+  tell(
+    blocked.length
+      ? `${blocked.length} of ${pool.length} scenarios have no line of sight at contact (map changed?), ids in the console`
+      : `all ${pool.length} scenarios have line of sight at contact`,
+  );
+}
+
 const HELP = [
   "!start / !stop / !skip, !diff easy|normal|hard|pro, !tier all|pro|high|mid|low|custom",
-  "!shoot assist|fake|off, !stats, !reset (session), !packs",
+  "!shoot assist|fake|off, !stats, !reset (session), !packs, !check (line of sight of every scenario)",
   "own peeks: stand on your angle + !hold, walk to the peek start + !rec, swing out and stop; !custom clear",
 ];
 
@@ -507,6 +527,8 @@ function onCommand(name: string, args: string[]) {
       state.recorder = new Recorder();
       setPhase("armed");
       return tell("recording starts when you move and stops when you stop");
+    case "check":
+      return checkScenarios();
     case "custom":
       if (arg === "clear") {
         (save.custom ??= {})[mapName()] = [];

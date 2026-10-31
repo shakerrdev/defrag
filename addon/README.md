@@ -20,6 +20,7 @@ Scenarios come from `scenario-packs/*.json` bundled at build time (see the main 
 | `!shoot assist\|fake\|off` | `assist`: real shots from the AI trigger (default). `fake`: silent scripted damage. `off`: bot never shoots |
 | `!stats`, `!reset` | Session stats / reset them |
 | `!packs` | Bundled packs and how many are for this map |
+| `!check` | Traces from every holding spot to its peek at contact; scenarios without line of sight point to a map build that differs from the demo |
 | `!hold`, `!rec`, `!custom [clear]` | Record your own peek: `!hold` on your angle, walk to the start, `!rec`, swing out and stop. Saved per map (up to 40) |
 | `!help` | Commands on screen |
 
