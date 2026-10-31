@@ -722,6 +722,7 @@ function toggleMenu(open = !menuOpen) {
   if (slot === undefined) return;
   if (!setMenuOpen(slot, open)) return tell("the custom HUD isn't loaded, use chat commands (!help)");
   menuOpen = open;
+  if (open) tell("menu open: click Close or type !menu again. No menu on screen? The custom HUD isn't rendering, use !help");
 }
 
 function updateMenu() {
