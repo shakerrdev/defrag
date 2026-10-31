@@ -28,7 +28,7 @@ See [addon/README.md](addon/README.md) for playing it.
 | `addon/` | The Workshop addon's map scripts (TypeScript bundled to the JavaScript CS2 loads) |
 | `packages/scenario` | The scenario pack format shared by the extractor and the map scripts |
 | `packages/extract` | Demo → scenario pack extractor (`pnpm extract`, uses demoparser2) |
-| `scenario-packs/` | Generated packs (`<map>.json`), bundled into the map script at build time; not committed |
+| `scenario-packs/` | Generated packs (`<map>.json`), bundled into the map script at build time together with the ones in `$CS2_ADDON_DIR/scenario-packs` (where the setup script keeps them); not committed |
 | `demos/` | Put demos here for the setup script to extract; not committed |
 
 Not in this repo, on purpose: decompiled official maps and other Valve assets, demos, and generated scenario packs. They stay local or go into releases.
@@ -41,7 +41,7 @@ Paste this into PowerShell:
 irm https://raw.githubusercontent.com/shakerrdev/defrag/main/tools/setup.ps1 | iex
 ```
 
-or double-click `setup.cmd` in a clone. It finds CS2 through Steam, checks for the Workshop Tools, downloads the code (when not run from a clone), gets a private copy of Node and pnpm if needed, creates the `defrag` addon, extracts peeks from demos in `demos/` (tier from `-Tier`, default `pro`) and from your own match replays in `game/csgo/replays` (tier `mid`), builds the map scripts with those packs into the addon, writes the `defrag` and `defrag_spike` console configs and offers to start the Workshop Tools. Run it again any time to update. `watch.cmd` does the same and then rebuilds on every save. Options: `-Cs2Path <folder>` if CS2 isn't found, `-Launch` to start the tools without asking.
+or double-click `setup.cmd` in a clone. It finds CS2 through Steam, checks for the Workshop Tools, downloads the code (when not run from a clone), gets a private copy of Node and pnpm if needed, creates the `defrag` addon, extracts peeks into the addon's `scenario-packs` folder from demos in `demos/` (tier from `-Tier`, default `pro`) and from your own match replays in `game/csgo/replays` (tier `mid`), builds the map scripts with those packs into the addon (demos already in a pack are skipped, so reruns are quick), writes the `defrag` and `defrag_spike` console configs and offers to start the Workshop Tools. Run it again any time to update. `watch.cmd` does the same and then rebuilds on every save. Options: `-Cs2Path <folder>` if CS2 isn't found, `-Launch` to start the tools without asking.
 
 ## Development setup
 

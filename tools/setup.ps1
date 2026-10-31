@@ -141,7 +141,8 @@ function Write-ScriptConfig($cs2, $name, $script, $what) {
   Ok "wrote $cfg"
 }
 
-function Extract-Scenarios($cs2, $repo) {
+function Extract-Scenarios($cs2, $repo, $addonContent) {
+  $packs = Join-Path $addonContent 'scenario-packs'
   $sources = @(
     @{ Dir = (Join-Path $repo 'demos'); Tier = $Tier },
     @{ Dir = (Join-Path $cs2 'game\csgo\replays'); Tier = 'mid' }
@@ -152,11 +153,10 @@ function Extract-Scenarios($cs2, $repo) {
     if (-not $demos.Count) { continue }
     Info "$($demos.Count) demo(s) in $($source.Dir), tier $($source.Tier)"
     $ErrorActionPreference = 'Continue'
-    pnpm extract --tier $source.Tier @demos
+    pnpm extract --tier $source.Tier --out $packs @demos
     $ErrorActionPreference = 'Stop'
     if ($LASTEXITCODE -ne 0) { Warn 'some demos could not be read, the rest were used' }
   }
-  $packs = Join-Path $repo 'scenario-packs'
   if (Test-Path $packs) {
     Get-ChildItem $packs -Filter *.json | ForEach-Object { Ok "pack $($_.BaseName)" }
   } else {
@@ -233,7 +233,7 @@ function Main {
     Ok $addonContent
 
     Step 'Extracting peeks from demos'
-    Extract-Scenarios $cs2 $repo
+    Extract-Scenarios $cs2 $repo $addonContent
 
     Step 'Building the map scripts'
     $env:CS2_ADDON_DIR = $addonContent

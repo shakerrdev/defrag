@@ -8,7 +8,31 @@ const outdir = join(root, "dist", "scripts");
 const addonDir = process.env.CS2_ADDON_DIR ? resolve(process.env.CS2_ADDON_DIR) : undefined;
 const watch = process.argv.includes("--watch");
 
-const packsDir = resolve(process.env.DEFRAG_PACKS_DIR ?? join(root, "..", "scenario-packs"));
+const packsDirs = [
+  resolve(process.env.DEFRAG_PACKS_DIR ?? join(root, "..", "scenario-packs")),
+  ...(process.env.CS2_ADDON_DIR ? [join(resolve(process.env.CS2_ADDON_DIR), "scenario-packs")] : []),
+];
+
+function readPacks() {
+  const byMap = new Map<string, Pack>();
+  const files: string[] = [];
+  for (const dir of packsDirs) {
+    if (!existsSync(dir)) continue;
+    for (const name of readdirSync(dir).filter((f) => f.endsWith(".json"))) {
+      const file = join(dir, name);
+      files.push(file);
+      const pack = JSON.parse(readFileSync(file, "utf8")) as Pack;
+      const seen = byMap.get(pack.map);
+      if (!seen) {
+        byMap.set(pack.map, pack);
+        continue;
+      }
+      const ids = new Set(seen.scenarios.map((s) => s.id));
+      seen.scenarios.push(...pack.scenarios.filter((s) => !ids.has(s.id)));
+    }
+  }
+  return { packs: [...byMap.values()], files };
+}
 
 const entryPoints = readdirSync(join(root, "src"))
   .filter((name) => name.endsWith(".ts") && !name.endsWith(".d.ts"))
@@ -40,19 +64,16 @@ const options: BuildOptions = {
     {
       name: "scenario-packs",
       setup(b) {
-        b.onResolve({ filter: /^defrag:packs$/ }, () => ({ path: packsDir, namespace: "scenario-packs" }));
+        b.onResolve({ filter: /^defrag:packs$/ }, () => ({ path: "packs", namespace: "scenario-packs" }));
         b.onLoad({ filter: /.*/, namespace: "scenario-packs" }, () => {
-          const files = existsSync(packsDir) ? readdirSync(packsDir).filter((f) => f.endsWith(".json")) : [];
-          const packs = files.map((f) => {
-            const pack = JSON.parse(readFileSync(join(packsDir, f), "utf8")) as Pack;
-            return { ...pack, scenarios: pack.scenarios.map(compact) };
-          });
-          console.log(`bundling ${packs.length} scenario pack(s), ${packs.reduce((n, p) => n + p.scenarios.length, 0)} scenarios, from ${packsDir}`);
+          const { packs, files } = readPacks();
+          const count = packs.reduce((n, p) => n + p.scenarios.length, 0);
+          console.log(`bundling ${count} scenarios on ${packs.length} map(s) from ${packsDirs.join(", ")}`);
           return {
-            contents: `export default ${JSON.stringify(packs)};`,
+            contents: `export default ${JSON.stringify(packs.map((p) => ({ ...p, demos: undefined, scenarios: p.scenarios.map(compact) })))};`,
             loader: "js",
-            watchDirs: existsSync(packsDir) ? [packsDir] : [],
-            watchFiles: files.map((f) => join(packsDir, f)),
+            watchDirs: packsDirs.filter((d) => existsSync(d)),
+            watchFiles: files,
           };
         });
       },
