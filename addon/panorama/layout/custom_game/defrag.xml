@@ -15,6 +15,7 @@
       <Label class="MenuInfo" text="{s:menu_info}" />
       <Panel class="MenuRow">
         <Button id="btn_start" class="MenuButton Primary"><Label text="Start" /></Button>
+        <Button id="btn_set" class="MenuButton Primary"><Label text="Set of 20" /></Button>
         <Button id="btn_stop" class="MenuButton"><Label text="Stop" /></Button>
         <Button id="btn_skip" class="MenuButton"><Label text="Skip" /></Button>
       </Panel>

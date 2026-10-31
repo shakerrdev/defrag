@@ -15,6 +15,7 @@ Scenarios come from `scenario-packs/*.json` bundled at build time (see the main 
 | Command | What it does |
 | --- | --- |
 | `!start` / `!stop` / `!skip` | Run reps back to back / stop / next scenario |
+| `!set 5–100` | A scored set of that many reps; at the end you get kills and median reaction, and the best set per size and map is saved |
 | `!diff auto\|easy\|normal\|hard\|pro` | Bot reaction time, accuracy and peek speed (normal = as in the demo). `auto` (default) starts at normal and adapts: fast kills make the bot quicker and more accurate, deaths and misses back it off (level 0.5–2, saved) |
 | `!focus on\|off` | Weight scenarios by how often you lose them (unplayed ones also come up more) |
 | `!worst` | The three scenarios you lose most (at least 2 reps each) |

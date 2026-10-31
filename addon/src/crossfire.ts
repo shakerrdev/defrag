@@ -28,7 +28,8 @@ import { Recorder, sampleAt, sampleOf, type Peek } from "./lib/peek.ts";
 import { adapt, focusWeight, scaled, worst, type ScenarioRecord } from "./lib/adaptive.ts";
 import { drawHud, hideHud, hudAvailable, isHud, setMenuOpen, setMenuText, spawnHud } from "./lib/hud.ts";
 import { loadSection, saveSection } from "./lib/save.ts";
-import { emptyStats, record, summary, type Outcome } from "./lib/stats.ts";
+import { beats, describeSet, setResult, type SetResult } from "./lib/sets.ts";
+import { emptyStats, record, summary, type Outcome, type Stats } from "./lib/stats.ts";
 
 type ShootMode = "assist" | "fake" | "off";
 type Phase = "idle" | "armed" | "waiting" | "peeking" | "fighting" | "gap";
@@ -85,6 +86,7 @@ const state = {
   recorder: new Recorder(),
   holdSpot: undefined as { position: Vector; angles: QAngle } | undefined,
   stats: emptyStats(),
+  set: undefined as { size: number; stats: Stats } | undefined,
   lastResult: undefined as { text: string; good: boolean; at: number } | undefined,
 };
 
@@ -92,7 +94,7 @@ type Save = {
   version: number;
   settings?: Partial<typeof settings>;
   custom?: Record<string, Scenario[]>;
-  bests?: Record<string, { reactMs?: number; streak?: number }>;
+  bests?: Record<string, { reactMs?: number; streak?: number; sets?: Record<string, SetResult> }>;
   level?: number;
   records?: Record<string, ScenarioRecord>;
 };
@@ -379,11 +381,30 @@ function finish(outcome: Outcome, text: string) {
     best = " - new best!";
   }
   if (state.stats.streak > (b.streak ?? 0)) b.streak = state.stats.streak;
+  if (state.set) {
+    record(state.set.stats, outcome, reactMs);
+    if (state.set.stats.reps >= state.set.size) finishSet();
+  }
   persist();
   const full = `${text}${reactMs !== undefined ? ` in ${reactMs} ms` : ""}${best}`;
   state.lastResult = { text: full, good: outcome === "kill", at: Instance.GetGameTime() };
   Console.Log(`[defrag] ${full}`);
   setPhase(state.running ? "gap" : "idle", GAP_SECONDS);
+}
+
+function finishSet() {
+  const set = state.set!;
+  state.set = undefined;
+  state.running = false;
+  const result = setResult(set.stats);
+  const sets = (bests().sets ??= {});
+  const previous = sets[set.size];
+  const isBest = beats(result, previous);
+  if (isBest) sets[set.size] = result;
+  tell(
+    `set of ${set.size} done: ${describeSet(result)}` +
+      (isBest ? (previous ? ` - new best (was ${describeSet(previous)})` : " - first set on this map") : `, best ${describeSet(previous!)}`),
+  );
 }
 
 function stop() {
@@ -515,7 +536,7 @@ function checkScenarios() {
 
 const HELP = [
   "!start / !stop / !skip, !diff auto|easy|normal|hard|pro, !tier all|pro|high|mid|low|custom, !weapons all|rifles|pistols|smgs|snipers",
-  "!menu (clickable settings), !gun rifle|ak47|m4a1_silencer|m4a1|awp|deagle|keep, !focus on|off, !worst, !hud auto|custom|debug",
+  "!set 20 (scored set, best saved), !menu (clickable settings), !gun rifle|ak47|m4a1_silencer|m4a1|awp|deagle|keep, !focus on|off, !worst, !hud auto|custom|debug",
   "!shoot assist|fake|off, !stats, !reset (session), !packs, !check (line of sight of every scenario)",
   "own peeks: stand on your angle + !hold, walk to the peek start + !rec, swing out and stop; !custom clear",
 ];
@@ -532,6 +553,7 @@ let helpUntil = 0;
 
 function hint() {
   if (state.phase === "armed") return state.recorder.recording ? "recording... stop moving to finish" : "armed: swing out like a peek, then stop";
+  if (state.set) return `set: rep ${state.set.stats.reps + 1} of ${state.set.size}, !stop to end`;
   if (state.running) return "running, !stop to end";
   if (!scenarios().length) return "no scenarios here: record one (!help) or add a pack";
   return "type !start, or !help";
@@ -583,11 +605,22 @@ function onCommand(name: string, args: string[]) {
     case "help":
       helpUntil = Instance.GetGameTime() + 20;
       return HELP.forEach(tell);
+    case "set": {
+      const size = Math.round(Number(arg));
+      if (!(size >= 5 && size <= 100)) return tell("set: a number of reps from 5 to 100, e.g. !set 20");
+      state.set = { size, stats: emptyStats() };
+      state.running = true;
+      tell(`set of ${size} reps started`);
+      return startRep();
+    }
     case "start":
     case "go":
+      state.set = undefined;
       state.running = true;
       return startRep();
     case "stop":
+      if (state.set) tell(`set stopped after ${state.set.stats.reps} of ${state.set.size} reps`);
+      state.set = undefined;
       stop();
       return tell("stopped");
     case "skip":
@@ -705,6 +738,10 @@ const MENU_ACTIONS: Record<string, () => void> = {
   btn_start: () => {
     toggleMenu(false);
     onCommand("start", []);
+  },
+  btn_set: () => {
+    toggleMenu(false);
+    onCommand("set", ["20"]);
   },
   btn_stop: () => onCommand("stop", []),
   btn_skip: () => onCommand("skip", []),

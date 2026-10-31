@@ -147,3 +147,21 @@ test("the HUD menu opens with input capture and its buttons change settings", ()
   assert.equal(hud.capture, false);
   assert.equal(JSON.parse(mock.save).crossfire.settings.difficulty, "easy");
 });
+
+test("a set ends after its reps and saves the best result", () => {
+  const hud = mock.entities.get("defrag_hud") as CustomHudLayout;
+  mock.emit("CustomHudClicked", { layout: hud, buttonId: "btn_close" });
+  mock.chat("!shoot off");
+  mock.chat("!set 5");
+  const kills = () => mock.log.filter((l) => l.startsWith("[defrag] killed")).length;
+  const start = kills();
+  for (let t = 0; t < 60 && kills() < start + 5; t += 0.25) {
+    mock.step(0.25);
+    mock.hurt(bot.pawn, 200, human.pawn, 2);
+    bot.pawn.alive = true;
+    bot.pawn.health = 100;
+  }
+  mock.step(1.5);
+  assert.ok(mock.log.some((l) => l.includes("set of 5 done: 5/5")), mock.log.slice(-8).join("\n"));
+  assert.equal(JSON.parse(mock.save).crossfire.bests.de_mirage.sets["5"].kills, 5);
+});
