@@ -1,7 +1,9 @@
 param(
   [switch]$Watch,
   [switch]$Launch,
-  [string]$Cs2Path
+  [string]$Cs2Path,
+  [ValidateSet("low", "mid", "high", "pro")]
+  [string]$Tier = "pro"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -128,15 +130,38 @@ function Find-Cs2 {
   throw 'CS2 not found in any Steam library. Run again with -Cs2Path "<folder that contains game and content>".'
 }
 
-function Write-SpikeConfig($cs2) {
-  $cfg = Join-Path $cs2 'game\csgo\cfg\defrag_spike.cfg'
+function Write-ScriptConfig($cs2, $name, $script, $what) {
+  $cfg = Join-Path $cs2 "game\csgo\cfg\$name.cfg"
   $lines = @(
-    '// written by the defrag setup script: loads the bot peek spike into the running map',
+    "// written by the defrag setup script: loads $what into the running map",
     'sv_cheats 1',
-    'ent_create point_script { "targetname" "defrag_spike" "cs_script" "maps/scripts/spike.vjs" }'
+    "ent_create point_script { ""targetname"" ""$name"" ""cs_script"" ""maps/scripts/$script.vjs"" }"
   )
   Set-Content $cfg $lines -Encoding ASCII
   Ok "wrote $cfg"
+}
+
+function Extract-Scenarios($cs2, $repo) {
+  $sources = @(
+    @{ Dir = (Join-Path $repo 'demos'); Tier = $Tier },
+    @{ Dir = (Join-Path $cs2 'game\csgo\replays'); Tier = 'mid' }
+  )
+  foreach ($source in $sources) {
+    if (-not (Test-Path $source.Dir)) { continue }
+    $demos = @(Get-ChildItem $source.Dir -Filter *.dem | ForEach-Object { $_.FullName })
+    if (-not $demos.Count) { continue }
+    Info "$($demos.Count) demo(s) in $($source.Dir), tier $($source.Tier)"
+    $ErrorActionPreference = 'Continue'
+    pnpm extract --tier $source.Tier @demos
+    $ErrorActionPreference = 'Stop'
+    if ($LASTEXITCODE -ne 0) { Warn 'some demos could not be read, the rest were used' }
+  }
+  $packs = Join-Path $repo 'scenario-packs'
+  if (Test-Path $packs) {
+    Get-ChildItem $packs -Filter *.json | ForEach-Object { Ok "pack $($_.BaseName)" }
+  } else {
+    Warn "no scenario packs yet: put demos in $(Join-Path $repo 'demos') or record peeks in game (!hold, !rec)"
+  }
 }
 
 function Compile-Scripts($cs2, $addonContent) {
@@ -202,6 +227,9 @@ function Main {
     if (Test-Path $oldScripts) { Remove-Item $oldScripts -Recurse -Force }
     Ok $addonContent
 
+    Step 'Extracting peeks from demos'
+    Extract-Scenarios $cs2 $repo
+
     Step 'Building the map scripts'
     $env:CS2_ADDON_DIR = $addonContent
     pnpm --filter @defrag/addon build
@@ -211,14 +239,16 @@ function Main {
     } else {
       Warn 'scripts not compiled because the Workshop Tools are missing: run this again once they are installed'
     }
-    Write-SpikeConfig $cs2
+    Write-ScriptConfig $cs2 'defrag' 'crossfire' 'the crossfire trainer'
+    Write-ScriptConfig $cs2 'defrag_spike' 'spike' 'the bot peek spike'
 
     Step 'Done'
     Info '1. Start Counter-Strike 2 Workshop Tools and pick the defrag addon.'
-    Info '2. In the console: map de_dust2   (any map with spawns and a nav mesh works)'
-    Info '3. Join CT, then in the console: exec defrag_spike'
-    Info '4. Chat should say "[defrag] spike loaded". Type !help in chat.'
-    Info 'No message? Place a point_script with cs_script = maps/scripts/spike.vjs in a map in Hammer instead (addon\README.md).'
+    Info '2. In the console: map de_mirage   (a map you have scenarios for; any map works for your own peeks)'
+    Info '3. Join a team, then in the console: exec defrag'
+    Info '4. Chat says "[defrag] crossfire loaded: N scenarios". Type !start, or !help for everything else.'
+    Info 'No scenarios? Stand on an angle and type !hold, walk to where the bot should come from, !rec, swing out and stop.'
+    Info 'The older test script is still there: exec defrag_spike (load only one of the two per map).'
     Info "While editing the scripts, run $(Join-Path $repo 'watch.cmd') to rebuild and copy them on every save."
 
     if ($Watch) {
