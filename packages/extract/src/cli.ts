@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { createRequire } from "node:module";
@@ -73,6 +73,18 @@ Existing packs in --out are merged (same scenario id = replaced).`);
   process.exit(1);
 }
 
+export function isCs2Demo(path: string) {
+  try {
+    const fd = openSync(path, "r");
+    const head = Buffer.alloc(8);
+    readSync(fd, head, 0, 8, 0);
+    closeSync(fd);
+    return head.toString("latin1") === "PBDEMS2\0";
+  } catch {
+    return false;
+  }
+}
+
 function readPack(file: string, map: string): Pack {
   if (!existsSync(file)) return { version: FORMAT_VERSION, map, name: map, scenarios: [] };
   return JSON.parse(readFileSync(file, "utf8")) as Pack;
@@ -86,6 +98,7 @@ export function main(argv = process.argv.slice(2)) {
       tier: { type: "string", default: "pro" },
       out: { type: "string", default: join(import.meta.dirname, "..", "..", "..", "scenario-packs") },
       "no-cluster": { type: "boolean", default: false },
+      force: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -93,11 +106,39 @@ export function main(argv = process.argv.slice(2)) {
   const tier = values.tier as Tier;
   if (!TIERS.includes(tier)) usage();
 
+  const out = resolve(values.out);
   const byMap = new Map<string, Scenario[]>();
+  const readDemos = new Map<string, string[]>();
   const rejected: Partial<Record<Rejection, number>> = {};
   for (const path of positionals) {
     const started = Date.now();
-    const demo = loadDemo(resolve(path));
+    const name = basename(path);
+    let map: string;
+    if (!isCs2Demo(resolve(path))) {
+      console.error(`${name}: not a CS2 demo, skipped`);
+      process.exitCode = 1;
+      continue;
+    }
+    try {
+      map = (parser.parseHeader(resolve(path)) as { map_name: string }).map_name;
+    } catch (error) {
+      console.error(`${name}: can't read it (${error instanceof Error ? error.message : error}), skipped`);
+      process.exitCode = 1;
+      continue;
+    }
+    if (!values.force && readPack(join(out, `${map}.json`), map).demos?.includes(name)) {
+      console.log(`${name} (${map}): already extracted, skipped (--force to redo)`);
+      continue;
+    }
+    let demo: DemoData;
+    try {
+      demo = loadDemo(resolve(path));
+    } catch (error) {
+      console.error(`${name}: parsing failed (${error instanceof Error ? error.message : error}), skipped`);
+      process.exitCode = 1;
+      continue;
+    }
+    readDemos.set(map, [...(readDemos.get(map) ?? []), name]);
     const result = findDuels(demo, { ...DEFAULT_OPTIONS, tier });
     for (const [why, n] of Object.entries(result.rejected)) rejected[why as Rejection] = (rejected[why as Rejection] ?? 0) + n;
     byMap.set(demo.map, [...(byMap.get(demo.map) ?? []), ...result.duels.map((d) => d.scenario)]);
@@ -105,7 +146,6 @@ export function main(argv = process.argv.slice(2)) {
   }
   console.log(`rejected: ${JSON.stringify(rejected)}`);
 
-  const out = resolve(values.out);
   mkdirSync(out, { recursive: true });
   for (const [map, found] of byMap) {
     const file = join(out, `${map}.json`);
@@ -113,6 +153,7 @@ export function main(argv = process.argv.slice(2)) {
     const merged = new Map(pack.scenarios.map((s) => [s.id, s]));
     for (const s of values["no-cluster"] ? found : cluster(found)) merged.set(s.id, s);
     pack.scenarios = [...merged.values()];
+    pack.demos = [...new Set([...(pack.demos ?? []), ...(readDemos.get(map) ?? [])])];
     const problems = packProblems(pack);
     if (problems.length) {
       console.error(`${map}: ${problems.length} problem(s), first: ${problems[0]}`);

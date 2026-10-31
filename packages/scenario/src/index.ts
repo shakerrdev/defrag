@@ -30,6 +30,7 @@ export type Pack = {
   build?: string;
   name: string;
   scenarios: Scenario[];
+  demos?: string[];
 };
 
 const r1 = (v: number) => Math.round(v * 10) / 10;

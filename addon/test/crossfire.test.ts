@@ -121,5 +121,6 @@ test("the custom HUD gets the overlay text when its layout entity exists", () =>
   mock.step(0.1);
   assert.match(hud.vars.get("defrag.title") ?? "", /^defrag crossfire \| de_mirage/);
   assert.match(hud.vars.get("defrag.session") ?? "", /kills/);
-  assert.equal(hud.classes.get("result.Hidden"), true);
+  assert.match(hud.vars.get("defrag.info") ?? "", /scenarios/);
+  assert.equal(hud.classes.get("card.Hidden"), false);
 });
