@@ -24,7 +24,8 @@ import {
 import { flushChat, parseCommand, recentMessages, tell } from "./lib/chat.ts";
 import { add, distance, lookAt, randomBetween, speed2d, ZERO } from "./lib/math.ts";
 import { Recorder, sampleAt, sampleOf, type Peek } from "./lib/peek.ts";
-import { emptyStats, record, summary, type Outcome, type Stats } from "./lib/stats.ts";
+import { adapt, focusWeight, scaled, worst, type ScenarioRecord } from "./lib/adaptive.ts";
+import { emptyStats, record, summary, type Outcome } from "./lib/stats.ts";
 
 type ShootMode = "assist" | "fake" | "off";
 type Phase = "idle" | "armed" | "waiting" | "peeking" | "fighting" | "gap";
@@ -42,7 +43,9 @@ const MISS_OFFSET_DEGREES = 4;
 const CUSTOM_LIMIT = 40;
 
 const settings = {
-  difficulty: "normal" as Difficulty,
+  difficulty: "auto" as Difficulty | "auto",
+  focus: false,
+  gun: "rifle",
   tier: "all" as Tier | "all",
   shoot: "assist" as ShootMode,
   delayMin: 0.6,
@@ -85,6 +88,8 @@ type Save = {
   settings?: Partial<typeof settings>;
   custom?: Record<string, Scenario[]>;
   bests?: Record<string, { reactMs?: number; streak?: number }>;
+  level?: number;
+  records?: Record<string, ScenarioRecord>;
 };
 
 let save: Save = { version: FORMAT_VERSION };
@@ -233,6 +238,17 @@ function giveWeapon(b: CSPlayerPawn, weapon: string) {
   b.GiveNamedItem(weapon, true);
 }
 
+const GUNS = ["rifle", "ak47", "m4a1_silencer", "m4a1", "awp", "deagle", "keep"];
+
+function giveGun(h: CSPlayerPawn) {
+  if (settings.gun === "keep") return;
+  const team = humanController()?.GetTeamNumber();
+  const name = `weapon_${settings.gun === "rifle" ? (team === 2 ? "ak47" : "m4a1_silencer") : settings.gun}`;
+  if (h.GetActiveWeapon()?.GetData().GetName() === name) return;
+  if (h.FindWeapon(name)) return;
+  h.GiveNamedItem(name, true);
+}
+
 function startRep() {
   const pool = scenarios();
   if (!pool.length) {
@@ -245,9 +261,11 @@ function startRep() {
     ensureOneBot();
     return setPhase("gap", 1);
   }
-  const scenario = pickWeighted(pool, Math.random, state.last)!;
+  const records = (save.records ??= {});
+  const weighted = pool.map((s) => ({ s, weight: settings.focus ? focusWeight(s.weight, records[s.id]) : s.weight }));
+  const scenario = pickWeighted(weighted, Math.random, weighted.find((w) => w.s === state.last))!.s;
   state.last = scenario;
-  const t = tuned(scenario, settings.difficulty);
+  const t = settings.difficulty === "auto" ? scaled(save.level ?? 1, tuned(scenario, "normal")) : tuned(scenario, settings.difficulty);
   const rep: Rep = {
     scenario,
     peek: { samples: samplesOf(scenario.frames), tickInterval: TICK },
@@ -270,6 +288,7 @@ function startRep() {
   h.Teleport({ position: { x, y, z }, angles: { pitch: scenario.holder.pitch, yaw: scenario.holder.yaw, roll: 0 }, velocity: ZERO });
   h.SetHealth(100);
   h.SetArmor(100);
+  giveGun(h);
   b.SetHealth(100);
   giveWeapon(b, scenario.weapon);
   b.Teleport({ position: rep.peek.samples[0]!.position, velocity: ZERO });
@@ -284,6 +303,12 @@ function finish(outcome: Outcome, text: string) {
   state.rep = undefined;
   const reactMs = outcome === "kill" && rep?.visibleAt !== undefined ? Math.round((Instance.GetGameTime() - rep.visibleAt) * 1000) : undefined;
   record(state.stats, outcome, reactMs);
+  if (rep) {
+    const r = ((save.records ??= {})[rep.scenario.id] ??= { reps: 0, kills: 0 });
+    r.reps++;
+    if (outcome === "kill") r.kills++;
+    if (settings.difficulty === "auto") save.level = adapt({ level: save.level ?? 1 }, outcome, reactMs, rep.reactMs);
+  }
   const b = bests();
   let best = "";
   if (reactMs !== undefined && (b.reactMs === undefined || reactMs < b.reactMs)) {
@@ -419,7 +444,8 @@ function checkScenarios() {
 }
 
 const HELP = [
-  "!start / !stop / !skip, !diff easy|normal|hard|pro, !tier all|pro|high|mid|low|custom",
+  "!start / !stop / !skip, !diff auto|easy|normal|hard|pro, !tier all|pro|high|mid|low|custom",
+  "!gun rifle|ak47|m4a1_silencer|m4a1|awp|deagle|keep, !focus on|off (more of the peeks you lose), !worst",
   "!shoot assist|fake|off, !stats, !reset (session), !packs, !check (line of sight of every scenario)",
   "own peeks: stand on your angle + !hold, walk to the peek start + !rec, swing out and stop; !custom clear",
 ];
@@ -446,7 +472,7 @@ function drawOverlay(now: number) {
   const lines: [string, typeof WHITE][] = [
     [`defrag crossfire | ${mapName()} | ${hint()}`, YELLOW],
     [
-      `${scenarios().length} scenarios (${settings.tier}) | ${settings.difficulty} | shoot ${settings.shoot} | ` +
+      `${scenarios().length} scenarios (${settings.tier}) | ${settings.difficulty === "auto" ? `auto ${(save.level ?? 1).toFixed(2)}` : settings.difficulty}${settings.focus ? " focus" : ""} | shoot ${settings.shoot} | ` +
         `best ${b.reactMs !== undefined ? `${b.reactMs} ms` : "-"} | best streak ${b.streak ?? 0}`,
       GREY,
     ],
@@ -489,10 +515,24 @@ function onCommand(name: string, args: string[]) {
       state.rep = undefined;
       return startRep();
     case "diff":
-      if (!(arg in DIFFICULTIES)) return tell(`difficulty: ${Object.keys(DIFFICULTIES).join(", ")}`);
-      settings.difficulty = arg as Difficulty;
+      if (arg !== "auto" && !(arg in DIFFICULTIES)) return tell(`difficulty: auto, ${Object.keys(DIFFICULTIES).join(", ")}`);
+      settings.difficulty = arg as Difficulty | "auto";
       persist();
-      return tell(`difficulty ${arg}`);
+      return tell(arg === "auto" ? `difficulty adapts to you, now ${(save.level ?? 1).toFixed(2)}` : `difficulty ${arg}`);
+    case "focus":
+      settings.focus = arg !== "off";
+      persist();
+      return tell(settings.focus ? "focus on: peeks you lose come up more" : "focus off");
+    case "gun":
+      if (!GUNS.includes(arg)) return tell(`gun: ${GUNS.join(", ")}`);
+      settings.gun = arg;
+      persist();
+      return tell(`gun ${arg}`);
+    case "worst": {
+      const list = worst(save.records ?? {});
+      if (!list.length) return tell("play a few reps first");
+      return tell(`hardest: ${list.map((w) => `${w.id} ${w.kills}/${w.reps}`).join(", ")}`);
+    }
     case "tier":
       if (arg !== "all" && !TIERS.includes(arg as Tier)) return tell(`tier: all, ${TIERS.join(", ")}`);
       settings.tier = arg as Tier | "all";
