@@ -264,6 +264,20 @@ function giveGun(h: CSPlayerPawn) {
   h.GiveNamedItem(name, true);
 }
 
+const HIDDEN_PRE_ROLL = 12;
+
+function hiddenStart(s: Scenario) {
+  const [x, y, z] = s.holder.position;
+  const start = { x, y, z: z + EYE };
+  const ignoreEntity = [human(), bot()].filter((p): p is CSPlayerPawn => p !== undefined);
+  for (let i = Math.min(s.contactFrame, s.frames.length - 1); i >= 0; i--) {
+    const f = s.frames[i]!;
+    const blocked = [EYE, 40].every((h) => Instance.TraceLine({ start, end: { x: f[0], y: f[1], z: f[2] + h }, ignoreEntity }).didHit);
+    if (blocked) return Math.max(0, i - HIDDEN_PRE_ROLL);
+  }
+  return 0;
+}
+
 function pickFrom(pool: Scenario[], records: Record<string, ScenarioRecord>) {
   const weighted = pool.map((s) => ({ s, weight: settings.focus ? focusWeight(s.weight, records[s.id]) : s.weight }));
   return pickWeighted(weighted, Math.random, weighted.find((w) => w.s === state.last))?.s;
@@ -296,7 +310,7 @@ function startRep() {
   const t = settings.difficulty === "auto" ? scaled(save.level ?? 1, tuned(scenario, "normal")) : tuned(scenario, settings.difficulty);
   const rep: Rep = {
     scenario,
-    peek: { samples: samplesOf(scenario.frames), tickInterval: TICK },
+    peek: { samples: samplesOf(scenario.frames.slice(hiddenStart(scenario))), tickInterval: TICK },
     reactMs: t.reactMs,
     accuracy: t.accuracy,
     speed: t.speed,
@@ -318,6 +332,7 @@ function startRep() {
   h.SetArmor(100);
   giveGun(h);
   b.SetHealth(100);
+  b.SetArmor(100);
   giveWeapon(b, scenario.weapon);
   b.Teleport({ position: rep.peek.samples[0]!.position, velocity: ZERO });
   applyFrame(b, rep, 0, true);
