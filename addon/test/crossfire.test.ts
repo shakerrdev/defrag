@@ -124,3 +124,14 @@ test("the custom HUD gets the overlay text when its layout entity exists", () =>
   assert.match(hud.vars.get("defrag.info") ?? "", /scenarios/);
   assert.equal(hud.classes.get("card.Hidden"), false);
 });
+
+test("scenarios whose holding spot can't see the peek are skipped", () => {
+  mock.chat("!stop");
+  mock.chat("!tier pro");
+  mock.wallBetween = true;
+  mock.chat("!check");
+  mock.chat("!start");
+  assert.ok(mock.log.some((l) => l.includes("none of the scenarios here have line of sight")));
+  mock.wallBetween = false;
+  mock.chat("!tier all");
+});

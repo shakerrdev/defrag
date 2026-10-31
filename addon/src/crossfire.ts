@@ -264,6 +264,11 @@ function giveGun(h: CSPlayerPawn) {
   h.GiveNamedItem(name, true);
 }
 
+function pickFrom(pool: Scenario[], records: Record<string, ScenarioRecord>) {
+  const weighted = pool.map((s) => ({ s, weight: settings.focus ? focusWeight(s.weight, records[s.id]) : s.weight }));
+  return pickWeighted(weighted, Math.random, weighted.find((w) => w.s === state.last))?.s;
+}
+
 function startRep() {
   const pool = scenarios();
   if (!pool.length) {
@@ -277,8 +282,16 @@ function startRep() {
     return setPhase("gap", 1);
   }
   const records = (save.records ??= {});
-  const weighted = pool.map((s) => ({ s, weight: settings.focus ? focusWeight(s.weight, records[s.id]) : s.weight }));
-  const scenario = pickWeighted(weighted, Math.random, weighted.find((w) => w.s === state.last))!.s;
+  let scenario: Scenario | undefined;
+  for (let tries = 0; tries < 25 && !scenario; tries++) {
+    const pick = pickFrom(pool.filter((s) => sight.get(s.id) !== false), records);
+    if (!pick) break;
+    if (hasSight(pick)) scenario = pick;
+  }
+  if (!scenario) {
+    stop();
+    return tell("none of the scenarios here have line of sight on this map version, try !tier all or record your own");
+  }
   state.last = scenario;
   const t = settings.difficulty === "auto" ? scaled(save.level ?? 1, tuned(scenario, "normal")) : tuned(scenario, settings.difficulty);
   const rep: Rep = {
@@ -440,20 +453,26 @@ function saveCustom(samples: ReturnType<Recorder["finish"]>) {
 
 const EYE = 64;
 
+const sight = new Map<string, boolean>();
+
+function hasSight(s: Scenario) {
+  const known = sight.get(s.id);
+  if (known !== undefined) return known;
+  const [x, y, z] = s.holder.position;
+  const f = s.frames[Math.min(s.contactFrame + 8, s.frames.length - 1)]!;
+  const ignoreEntity = [human(), bot()].filter((p): p is CSPlayerPawn => p !== undefined);
+  const visible = !Instance.TraceLine({ start: { x, y, z: z + EYE }, end: { x: f[0], y: f[1], z: f[2] + EYE }, ignoreEntity }).didHit;
+  sight.set(s.id, visible);
+  return visible;
+}
+
 function checkScenarios() {
   const pool = scenarios();
-  const blocked: string[] = [];
-  for (const s of pool) {
-    const [x, y, z] = s.holder.position;
-    const f = s.frames[Math.min(s.contactFrame + 8, s.frames.length - 1)]!;
-    const start = { x, y, z: z + EYE };
-    const end = { x: f[0], y: f[1], z: f[2] + EYE };
-    if (Instance.TraceLine({ start, end }).didHit) blocked.push(s.id);
-  }
+  const blocked = pool.filter((s) => !hasSight(s)).map((s) => s.id);
   Console.Log(`[defrag] check: ${blocked.length} of ${pool.length} without line of sight: ${blocked.join(" ")}`);
   tell(
     blocked.length
-      ? `${blocked.length} of ${pool.length} scenarios have no line of sight at contact (map changed?), ids in the console`
+      ? `${blocked.length} of ${pool.length} scenarios have no line of sight at contact (map changed?) and are skipped, ids in the console`
       : `all ${pool.length} scenarios have line of sight at contact`,
   );
 }
