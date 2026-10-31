@@ -199,7 +199,7 @@ function Build-MapSource($cs2, $repo, $addonContent, $name) {
     $ErrorActionPreference = 'Stop'
     $nested = Join-Path $maps 'maps'
     if (Test-Path $nested) {
-      Get-ChildItem $nested | ForEach-Object { Move-Item $_.FullName (Join-Path $maps $_.Name) -Force }
+      Copy-Item (Join-Path $nested '*') $maps -Recurse -Force
       Remove-Item $nested -Recurse -Force
       Info 'moved the split map parts from maps\maps up into maps'
     }
